@@ -1,0 +1,58 @@
+{
+  "name": "smart-interview-app-server",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js",
+    "dev": "nodemon app.js",
+    "python:dev": "cd python_microservice && python session_monitor.py",
+    "python:docker": "cd python_microservice && docker build -t session-monitor . && docker run -p 8001:8001 session-monitor",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix"
+  },
+  "dependencies": {
+    "axios": "^1.6.2",
+    "bcrypt": "^6.0.0",
+    "cloudinary": "^2.0.1",
+    "compression": "^1.7.4",
+    "cookie-parser": "^1.4.6",
+    "cors": "^2.8.5",
+    "dotenv": "^16.5.0",
+    "express": "^4.21.2",
+    "express-rate-limit": "^7.5.1",
+    "express-validator": "^7.2.1",
+    "helmet": "^8.0.0",
+    "ioredis": "^5.3.2",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.15.2",
+    "morgan": "^1.10.0",
+    "multer": "^2.0.1",
+    "openai": "^5.3.0",
+    "razorpay": "^2.9.6",
+    "ws": "^8.14.2"
+  },
+  "devDependencies": {
+    "eslint": "^8.55.0",
+    "jest": "^29.7.0",
+    "nodemon": "^3.1.10",
+    "supertest": "^6.3.3"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  },
+  "keywords": [
+    "interview",
+    "mock-interview",
+    "ai",
+    "security",
+    "monitoring",
+    "websocket",
+    "python-microservice"
+  ],
+  "author": "Your Name",
+  "license": "MIT"
+}
