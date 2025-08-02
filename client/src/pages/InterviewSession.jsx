@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef, use } from 'react';
 import { startInterview } from '../services/api/interview';
 import { useNavigate } from 'react-router-dom';
-import { get, set } from 'mongoose';
 import { getQuestion } from '../services/api/question';
 
 const InterviewSession = () => {
