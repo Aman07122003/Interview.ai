@@ -4,7 +4,6 @@ import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate, Link } from 'react-router-dom';
 import { logout, getCurrentUser } from '../store/slice/authSlice';
 import Gemini_Generated_Image_q63u32q63u32q63u from '../assets/Gemini_Generated_Image_q63u32q63u32q63u.png';
-import { set } from 'mongoose';
 
 // LogoutButton component
 const LogoutButton = () => {
