@@ -56,17 +56,13 @@ app.use(helmet({
 }));
 
 // CORS configuration
+const allowedOrigins = [
+  "http://localhost:5173",
+]
+
 app.use(cors({
-  origin: [
-    process.env.FRONTEND_URL || "http://localhost:3000",
-    "http://localhost:5173", // Vite default port
-    "http://localhost:4173", // Vite preview port
-    "http://127.0.0.1:5173",
-    "http://127.0.0.1:4173"
-  ],
-  credentials: true,
-  methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
-  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "X-Device-Fingerprint"],
+  origin: allowedOrigins,
+  credentials: true
 }));
 
 // Body parsing middleware

@@ -4,6 +4,8 @@ import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate, Link } from 'react-router-dom';
 import { logout, getCurrentUser } from '../store/slice/authSlice';
 import Gemini_Generated_Image_q63u32q63u32q63u from '../assets/Gemini_Generated_Image_q63u32q63u32q63u.png';
+import axiosInstance from '../../utils/axiosInstance';
+import axios from 'axios';
 
 // LogoutButton component
 const LogoutButton = () => {
@@ -25,8 +27,9 @@ const LogoutButton = () => {
     }
   };
 
-  
-  
+  console.log("🚀 Home.jsx new version loaded");
+
+
   return (
     <button 
       onClick={handleLogout}
@@ -37,17 +40,6 @@ const LogoutButton = () => {
   );
 };
 
-const handlePayment = () => {
-  // This function can be used to handle payment logic
-  // For now, we'll just log a message
-  console.log('Redirecting to payment gateway...');
-  // You can implement actual payment logic here
-  // For example, redirect to a payment page or open a payment modal
-  window.location.href = '/payment'; // Example redirect
-}
-
-
-
 const Home = () => {
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const profileMenuRef = useRef(null);
@@ -57,75 +49,206 @@ const Home = () => {
   const isAuthenticated = !!(user && accessToken);
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [subscriptionLoading, setSubscriptionLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [selectedPlan, setSelectedPlan] = useState('free');
+  const [plans, setPlans] = useState([]);
 
-  const plans = [
-    {
-      id: 'basic',
-      name: 'Basic Plan',
-      price: 0,
-      features: [
-        'Access to basic content',
-        'Limited downloads',
-        'Email support',
-        '1 user account'
-      ],
-      duration: 'month',
-      buttonText: 'Get Started Free'
-    },
-    {
-      id: 'premium',
-      name: 'Premium Plan',
-      price: 19,
-      features: [
-        'Full content access',
-        'Unlimited downloads',
-        'Priority support',
-        'Up to 3 user accounts',
-        'Advanced analytics'
-      ],
-      duration: 'month',
-      buttonText: 'Subscribe Now',
-    },
-    {
-      id: 'enterprise',
-      name: 'Enterprise Plan',
-      price: 199,
-      features: [
-        'All premium features',
-        'Dedicated account manager',
-        'Custom integrations',
-        'Unlimited user accounts',
-        'API access'
-      ],
-      duration: 'month',
-      buttonText: 'Contact Sales'
-    }
-  ];
-
-  // Handle plan selection
-  const handleSubscribe = (planId) => {
-    setSelectedPlan(planId);
-    setLoading(true);
-    setError(null);
-  
-    // Simulate API call to subscribe to the plan
-    setTimeout(() => {
-      setLoading(false);
-      if (planId === 'free') {
-        navigate('/interview');
-      } else {
-        // Pass the plan object instead of just the ID
-        navigate('/subscription', { 
-          state: { 
-            planId: planId,
-            planData: plans.find(p => p.id === planId) 
-          } 
-        });
+  useEffect(() => {
+    // Fetch plans from your API
+    const fetchPlans = async () => {
+      try {
+        const response = await axios.get("http://localhost:3000/api/subscription/plans");
+        console.log(response.data);
+        if (response.data.success) {
+          setPlans(response.data.plans);
+        }
+      } catch (error) {
+        console.error("Error fetching plans:", error);
       }
-    }, 1000);
+    };
+
+    fetchPlans();
+  }, []);
+
+  // Payment verification function
+  const verifyPayment = async (paymentResponse, subscriptionId) => {
+    try {
+      const response = await axiosInstance.post('/api/subscriptions/verify', {
+        subscriptionId,
+        razorpay_payment_id: paymentResponse.razorpay_payment_id,
+        razorpay_order_id: paymentResponse.razorpay_order_id,
+        razorpay_signature: paymentResponse.razorpay_signature
+      });
+
+      navigate('/subscription/success', {
+        state: {
+          subscription: response.data.subscription,
+          plan: plans.find(p => p.id === response.data.subscription.planId)
+        }
+      });
+    } catch (err) {
+      console.error("Payment verification failed:", err);
+      setError("Payment verification failed. Please contact support.");
+      navigate('/subscription/failure', {
+        state: {
+          error: err.response?.data?.message || err.message,
+          plan: plans.find(p => p.id === subscriptionId.split('_')[0]) // Extract plan ID from subscription ID if possible
+        }
+      });
+    }
   };
+
+  // Handle plan selection and subscription
+  // Handle plan selection and subscription
+// Handle plan selection and subscription
+// Handle plan selection and subscription
+// Handle plan selection and subscription
+const handleSubscribe = async (plan) => {
+  console.log("Plan clicked:", plan);
+
+  setSubscriptionLoading(true);
+  setError('');
+
+  try {
+    // Free plan shortcut
+    if (plan.price === 0) {
+      navigate('/interview');
+      return;
+    }
+
+    // Call backend with correct endpoint and parameter names
+    const response = await axiosInstance.post('/api/subscriptions', {
+      plan: plan.id,
+      amount: plan.price,
+    });
+
+    console.log("FULL Subscription response:", response);
+    console.log("Response data:", response.data);
+
+    // Check if response has the expected structure
+    if (!response.data || !response.data.data) {
+      throw new Error("No data received from server");
+    }
+
+    // Extract the nested data
+    const responseData = response.data.data;
+    console.log("Nested data:", responseData);
+    
+    // Check what properties we actually have
+    console.log("Response data keys:", Object.keys(responseData));
+    
+    if (responseData.razorpayKeyId) {
+      console.log("razorpayKeyId:", responseData.razorpayKeyId);
+    } else {
+      console.log("razorpayKeyId is missing");
+    }
+    
+    if (responseData.subscription) {
+      console.log("subscription:", responseData.subscription);
+    } else {
+      console.log("subscription is missing");
+    }
+    
+    if (responseData.razorpayOrder) {
+      console.log("razorpayOrder:", responseData.razorpayOrder);
+    } else {
+      console.log("razorpayOrder is missing");
+    }
+
+    // Check if response has the expected structure
+    if (!responseData.razorpayKeyId || !responseData.subscription || !responseData.razorpayOrder) {
+      throw new Error(`Invalid response from server. Expected razorpayKeyId, subscription, and razorpayOrder, got: ${JSON.stringify(responseData)}`);
+    }
+
+    // Check if Razorpay is available
+    if (typeof window.Razorpay === 'undefined') {
+      throw new Error("Payment gateway not loaded. Please refresh the page.");
+    }
+
+    const options = {
+      key: responseData.razorpayKeyId,
+      amount: responseData.razorpayOrder.amount, // Use amount from razorpayOrder (already in paise)
+      currency: responseData.razorpayOrder.currency || 'INR',
+      name: "Interview.ai",
+      description: `${plan.name} Subscription`,
+      order_id: responseData.razorpayOrder.id,
+      handler: async (paymentResponse) => {
+        try {
+          await verifyPayment(paymentResponse, responseData.subscription.id);
+        } catch (err) {
+          console.error("Verification failed:", err);
+          setError("Payment verification failed. Please contact support.");
+        } finally {
+          setSubscriptionLoading(false);
+        }
+      },
+      prefill: {
+        name: user.name || '',
+        email: user.email || '',
+        contact: user.phone || ''
+      },
+      theme: {
+        color: "#3399cc"
+      },
+      modal: {
+        ondismiss: function() {
+          console.log("Payment modal dismissed");
+          setSubscriptionLoading(false);
+          setError("Payment was cancelled");
+        }
+      }
+    };
+
+    console.log("Razorpay options:", options);
+
+    const rzp = new window.Razorpay(options);
+    
+    // Add event listeners for debugging
+    rzp.on('payment.failed', function(response) {
+      console.error("Payment failed:", response.error);
+      setError(`Payment failed: ${response.error.description}`);
+      setSubscriptionLoading(false);
+    });
+
+    rzp.on('payment.success', function(response) {
+      console.log("Payment success:", response);
+    });
+
+    // Open the Razorpay modal
+    rzp.open();
+
+  } catch (err) {
+    console.error('Subscription error:', err);
+    console.error('Error response:', err.response);
+    
+    let errorMessage = 'An error occurred while processing your subscription';
+    
+    if (err.response?.data?.message) {
+      errorMessage = err.response.data.message;
+    } else if (err.message) {
+      errorMessage = err.message;
+    }
+    
+    setError(errorMessage);
+    setSubscriptionLoading(false);
+  }
+};
+
+// Add this function to debug Razorpay loading
+const checkRazorpay = () => {
+  if (typeof window.Razorpay === 'undefined') {
+    console.error("Razorpay not loaded!");
+    setError("Payment system not loaded. Please refresh the page.");
+    return false;
+  }
+  console.log("Razorpay is loaded:", window.Razorpay);
+  return true;
+};
+
+// Call this before attempting payment
+if (!checkRazorpay()) {
+  return;
+}
 
   // Fetch current user if we have tokens but no user
   useEffect(() => {
@@ -148,6 +271,7 @@ const Home = () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, []);
+
 
 return (
     <div className="min-h-screen bg-black text-white overflow-x-hidden">
@@ -296,8 +420,8 @@ return (
         </div>
       </section>
 
-      {/* Features Section */}
-      <section id="features" className="py-20 px-4 bg-gradient-to-b from-gray-900 to-black">
+{/* Features Section */}
+<section id="features" className="py-20 px-4 bg-gradient-to-b from-gray-900 to-black">
         <div className="max-w-7xl mx-auto">
           <h2 className="text-4xl md:text-5xl font-bold mb-16 text-center bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
             Powerful Features
@@ -363,41 +487,34 @@ return (
       {/* Pricing Section */}
       <section id="pricing" className="py-20 px-4 bg-gradient-to-b from-black to-gray-900">
         <div className="max-w-6xl mx-auto">
-          <h2 className="text-4xl md:text-xl font-bold mb-16 text-center bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
+          <h2 className="text-4xl md:text-5xl font-bold mb-16 text-center bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
             Choose Your Plan
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
-            { plans.map((plan) => (
-              <div key={plan.id}  className="group bg-gradient-to-br from-gray-800/50 to-gray-900/50 backdrop-blur-sm rounded-3xl p-8 border border-gray-700/50 hover:border-purple-500/50 transition-all duration-300 hover:scale-105">
-              <h3 className="font-bold text-2xl mb-4 text-white">{plan.name}</h3>
-              <div className="mb-6">
-                <span className="text-5xl font-black text-white">${plan.price}</span>
-                <span className="text-gray-400 ml-2">/month</span>
-              </div>
-              <ul className="space-y-4 mb-8">
-                <li className="flex items-center text-gray-300">
-                  <span className="text-green-400 mr-3">✓</span>
-                  {plan.features[0]}
-                </li>
-                <li className="flex items-center text-gray-300">
-                  <span className="text-green-400 mr-3">✓</span>
-                  {plan.features[1]}
-                </li>
-                <li className="flex items-center text-gray-300">
-                  <span className="text-green-400 mr-3">✓</span>
-                  {plan.features[2]}
-                </li>
-                <li className="flex items-center text-gray-300">
-                  <span className="text-green-400 mr-3">✓</span>
-                  {plan.features[3]}
-                </li>
-              </ul>
-              <button 
-                onClick={() => handleSubscribe(plan.id)}
-                className="w-full py-4 rounded-full border-2 border-purple-400 hover:bg-purple-900/30 font-bold transition-all duration-300 hover:scale-105"
-              >
-                {plan.buttonText}
-              </button>
+            {plans.map((plan) => (
+              <div key={plan.id} className="group bg-gradient-to-br from-gray-800/50 to-gray-900/50 backdrop-blur-sm rounded-3xl p-8 border border-gray-700/50 hover:border-purple-500/50 transition-all duration-300 hover:scale-105">
+                <h3 className="font-bold text-2xl mb-4 text-white">{plan.name}</h3>
+                <div className="mb-6">
+                  <span className="text-5xl font-black text-white">${plan.price}</span>
+                  <span className="text-gray-400 ml-2">/month</span>
+                </div>
+                <ul className="space-y-4 mb-8">
+                  {plan.features.slice(0, 4).map((feature, index) => (
+                    <li key={index} className="flex items-center text-gray-300">
+                      <span className="text-green-400 mr-3">✓</span>
+                      {feature}
+                    </li>
+                  ))}
+                </ul>
+                <button 
+                  onClick={() => handleSubscribe(plan)}
+                  disabled={subscriptionLoading}
+                  className={`w-full py-4 rounded-full border-2 border-purple-400 hover:bg-purple-900/30 font-bold transition-all duration-300 hover:scale-105 ${
+                    subscriptionLoading ? 'opacity-50 cursor-not-allowed' : ''
+                  }`}
+                >
+                  {subscriptionLoading ? 'Processing...' : (plan.buttonText || 'Subscribe')}
+                </button>
               </div>
             ))}
           </div>

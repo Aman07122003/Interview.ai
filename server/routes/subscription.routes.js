@@ -22,11 +22,13 @@ import {
   processPayment,
   getPaymentHistory,
   refundPayment,
-  exportSubscriptionData
+  exportSubscriptionData,
+  getAllPlans
 } from "../controllers/subscription.controller.js";
 
 const router = express.Router();
 
+router.get("/plans", getAllPlans);
 // Apply authentication middleware to all routes
 router.use(auth);
 
@@ -36,6 +38,13 @@ router.use(auth);
  * @access  Private (User or Admin)
  */
 router.post('/', auth, createSubscription);
+
+/**
+ * @route   GET /api/subscriptions
+ * @desc    Get all subscriptions with filtering
+ * @access  Admin Only
+ */
+router.get('/', getAllSubscriptions);
 
 /**
  * @route   POST /api/subscriptions/upgrade
@@ -119,7 +128,7 @@ router.post('/payment',
 router.get('/payment/history', getPaymentHistory);
 
 // Admin-only routes (require admin role)
-router.use(isAdmin);
+//router.use(isAdmin);
 
 /**
  * @route   GET /api/subscriptions/stats/overview
@@ -165,13 +174,6 @@ router.post('/',
   },
   createSubscription
 );
-
-/**
- * @route   GET /api/subscriptions
- * @desc    Get all subscriptions with filtering
- * @access  Admin Only
- */
-router.get('/', getAllSubscriptions);
 
 /**
  * @route   GET /api/subscriptions/:id

@@ -3,6 +3,7 @@ import { Subscription } from "../models/Subscription.js";
 import { User } from "../models/User.js";
 import { APIResponse } from "../utils/APIResponse.js";
 import { APIError } from "../utils/APIError.js";
+import { PLAN_PRICES } from "../models/Subscription.js";  
 import mongoose from "mongoose";
 import Razorpay from "razorpay";
 import dotenv from "dotenv";
@@ -108,6 +109,79 @@ export const createSubscription = asyncHandler(async (req, res) => {
     }, "Subscription and Razorpay order created successfully")
   );
 });
+
+
+/**
+ * @desc Get all available subscription plans
+ * @route GET /api/plans
+ * @access Public
+ */
+export const getAllPlans = (req, res) => {
+  // Define plan metadata
+  const planDetails = [
+    {
+      id: "free",
+      name: "Free Plan",
+      features: [
+        "Access to basic content",
+        "Limited downloads",
+        "Email support",
+        "1 user account"
+      ],
+      duration: "10 years",
+      buttonText: "Get Started Free"
+    },
+    {
+      id: "basic",
+      name: "Basic Plan",
+      features: [
+        "Access to basic content",
+        "Limited downloads",
+        "Email support",
+        "1 user account"
+      ],
+      duration: "month",
+      buttonText: "Get Started Free"
+    },
+    {
+      id: "premium",
+      name: "Premium Plan",
+      features: [
+        "Full content access",
+        "Unlimited downloads",
+        "Priority support",
+        "Up to 3 user accounts",
+        "Advanced analytics"
+      ],
+      duration: "month",
+      buttonText: "Subscribe Now"
+    },
+    {
+      id: "enterprise",
+      name: "Enterprise Plan",
+      features: [
+        "All premium features",
+        "Dedicated account manager",
+        "Custom integrations",
+        "Unlimited user accounts",
+        "API access"
+      ],
+      duration: "month",
+      buttonText: "Contact Sales"
+    }
+  ];
+
+  // Attach price from PLAN_PRICES
+  const plans = planDetails.map(plan => ({
+    ...plan,
+    price: PLAN_PRICES[plan.id] || 0
+  }));
+
+  return res.json({
+    success: true,
+    plans
+  });
+};
 
 
 /**

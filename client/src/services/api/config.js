@@ -13,7 +13,7 @@ import axios from 'axios';
 
 // Environment configuration
 const API_CONFIG = {
-  baseURL: 'http://localhost:8000/api',
+  baseURL: 'http://localhost:3000/api',
   timeout: 30000, // 30 seconds
   withCredentials: process.env.NODE_ENV === 'production', // Use cookies in production
 };

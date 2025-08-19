@@ -246,7 +246,7 @@ const InterviewSession = () => {
                     {questions}
                   </span>
                   <span className="px-4 py-2 bg-gray-600/20 text-gray-300 rounded-xl text-sm font-medium border border-gray-500/30">
-                    {questions[currentQuestionIndex].difficulty}
+                    {questions[currentQuestionIndex]}
                   </span>
                 </div>
                 <div className="text-right">
