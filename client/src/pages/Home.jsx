@@ -326,7 +326,7 @@ return (
         ) : (
         <div className="flex items-center space-x-4">
           <a href="/login" className="text-gray-300 hover:text-white transition-all duration-300 hover:scale-105">Login</a>
-          <a href="/register" className="px-6 py-2 rounded-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 font-semibold transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-purple-500/25">
+          <a href="/selectRole" className="px-6 py-2 rounded-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 font-semibold transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-purple-500/25">
             Register
           </a>
         </div>

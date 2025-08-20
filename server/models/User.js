@@ -30,7 +30,6 @@ const userSchema = new Schema(
     },
     phone: {
       type: String,
-      required: true,
     },
     linkedin: {
       type: String,
@@ -45,13 +44,6 @@ const userSchema = new Schema(
     },
     refreshToken: {
       type: String,
-    },
-    role: {
-      type: String,
-      enum: ["user", "admin", "candidate", "recruiter", "hiring-manager", "student"],
-      default: "candidate",
-      required: true,
-      index: true,
     },
     accountType: {
       type: String,
@@ -97,7 +89,6 @@ userSchema.methods.generateAccessToken = function () {
       _id: this._id,
       email: this.email,
       username: this.username,
-      role: this.role,
       accountType: this.accountType,
     },
     process.env.ACCESS_TOKEN_SECRET,
@@ -117,7 +108,6 @@ userSchema.methods.generateRefreshToken = function () {
 };
 
 // Create indexes for better query performance
-userSchema.index({ role: 1, createdAt: -1 });
 userSchema.index({ username: 1, email: 1 });
 
 export const User = mongoose.model("User", userSchema);

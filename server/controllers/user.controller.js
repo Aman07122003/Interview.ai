@@ -1,7 +1,6 @@
 import asyncHandler from "../utils/asyncHandler.js";
 import { APIError } from "../utils/APIError.js";
 import { User } from "../models/User.js";
-import { Interview } from "../models/Interview.js";
 import {
   deleteImageOnCloudinary,
   uploadPhotoOnCloudinary as uploadOnCloudinary,

@@ -1,15 +1,18 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
-import { register } from '../store/slice/authSlice';
+import { registerAdmin } from '../store/slice/adminAuthSlice.jsx'; // You'll need to create this
 
-const Register = () => {
+const AdminRegister = () => {
   const [formData, setFormData] = useState({
+    username: '',
     fullName: '',
     email: '',
     password: '',
     confirmPassword: '',
-    role: 'candidate',
+    company: '',
+    position: '',
+    expertise: [],
     agreeToTerms: false
   });
 
@@ -17,18 +20,44 @@ const Register = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [profilePic, setProfilePic] = useState(null);
-  const [profilePicPreview, setProfilePicPreview] = useState(null);
+  const [avatar, setAvatar] = useState(null);
+  const [avatarPreview, setAvatarPreview] = useState(null);
 
   const dispatch = useDispatch();
   const navigate = useNavigate();
 
+  // Expertise options
+  const expertiseOptions = [
+    "Technical",
+    "Behavioural",
+    "System Design",
+    "Frontend",
+    "Backend",
+    "DevOps",
+    "AI/ML",
+    "Data Structures & Algorithms",
+    "Soft Skills"
+  ];
+
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: type === 'checkbox' ? checked : value
-    }));
+    
+    if (name === 'expertise') {
+      // Handle expertise as an array
+      const updatedExpertise = formData.expertise.includes(value)
+        ? formData.expertise.filter(item => item !== value)
+        : [...formData.expertise, value];
+      
+      setFormData(prev => ({
+        ...prev,
+        expertise: updatedExpertise
+      }));
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        [name]: type === 'checkbox' ? checked : value
+      }));
+    }
     
     // Clear error when user starts typing
     if (errors[name]) {
@@ -39,14 +68,14 @@ const Register = () => {
     }
   };
 
-  const handleProfilePicChange = (e) => {
+  const handleAvatarChange = (e) => {
     const file = e.target.files[0];
     if (file) {
       // Validate file type
       if (!file.type.startsWith('image/')) {
         setErrors(prev => ({
           ...prev,
-          profilePic: 'Please select a valid image file'
+          avatar: 'Please select a valid image file'
         }));
         return;
       }
@@ -55,19 +84,19 @@ const Register = () => {
       if (file.size > 5 * 1024 * 1024) {
         setErrors(prev => ({
           ...prev,
-          profilePic: 'Image size should be less than 5MB'
+          avatar: 'Image size should be less than 5MB'
         }));
         return;
       }
 
-      setProfilePic(file);
-      setProfilePicPreview(URL.createObjectURL(file));
+      setAvatar(file);
+      setAvatarPreview(URL.createObjectURL(file));
       
       // Clear error
-      if (errors.profilePic) {
+      if (errors.avatar) {
         setErrors(prev => ({
           ...prev,
-          profilePic: ''
+          avatar: ''
         }));
       }
     }
@@ -75,6 +104,13 @@ const Register = () => {
 
   const validateForm = () => {
     const newErrors = {};
+
+    // Username validation
+    if (!formData.username.trim()) {
+      newErrors.username = 'Username is required';
+    } else if (formData.username.length < 3) {
+      newErrors.username = 'Username must be at least 3 characters';
+    }
 
     // Full Name validation
     if (!formData.fullName.trim()) {
@@ -89,6 +125,11 @@ const Register = () => {
       newErrors.email = 'Email is required';
     } else if (!emailRegex.test(formData.email)) {
       newErrors.email = 'Please enter a valid email address';
+    }
+
+    // Company validation
+    if (!formData.company.trim()) {
+      newErrors.company = 'Company name is required';
     }
 
     // Password validation
@@ -107,6 +148,11 @@ const Register = () => {
       newErrors.confirmPassword = 'Passwords do not match';
     }
 
+    // Expertise validation
+    if (formData.expertise.length === 0) {
+      newErrors.expertise = 'Please select at least one area of expertise';
+    }
+
     // Terms agreement validation
     if (!formData.agreeToTerms) {
       newErrors.agreeToTerms = 'You must agree to the terms and conditions';
@@ -123,67 +169,70 @@ const Register = () => {
       return;
     }
 
-   if(!profilePic){
-    setErrors({ profilePic: 'Please upload a profile picture' });
-    return;
-   }
+    if (!avatar) {
+      setErrors({ avatar: 'Please upload a profile picture' });
+      return;
+    }
 
-   const payload = new FormData();
+    const payload = new FormData();
+    payload.append('username', formData.username);
     payload.append('fullName', formData.fullName);
     payload.append('email', formData.email);
     payload.append('password', formData.password);
-    payload.append('role', formData.role);
-    payload.append('avatar', profilePic);
+    payload.append('company', formData.company);
+    payload.append('position', formData.position || '');
+    payload.append('expertise', JSON.stringify(formData.expertise));
+    payload.append('avatar', avatar);
 
     for (let pair of payload.entries()) {
-        console.log(pair[0] + ': ' + pair[1]);
+      console.log(pair[0] + ': ' + pair[1]);
     }
 
-    try{
-        setIsLoading(true);
-        await dispatch(register(payload)).unwrap();
-        navigate('/login');
-    }catch(error){
-        console.error('Registration error:', error);
-        setErrors({ submit: 'Registration failed. Please try again.' });
-    }finally{
-        setIsLoading(false);
+    try {
+      setIsLoading(true);
+      await dispatch(registerAdmin(payload)).unwrap();
+      navigate('/admin/login');
+    } catch (error) {
+      console.error('Admin registration error:', error);
+      setErrors({ submit: error.message || 'Registration failed. Please try again.' });
+    } finally {
+      setIsLoading(false);
     }
-   }
+  };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900 flex items-center justify-center py-4 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-2xl w-full space-y-8">
         {/* Header */}
         <div className="text-center">
-          <div className="mx-auto h-12 w-12 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
-            <svg className="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+          <div className="mx-auto h-16 w-16 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
+            <svg className="h-8 w-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2" />
             </svg>
           </div>
           <h2 className="mt-6 text-3xl font-extrabold text-white">
-            Create your account
+            Create Admin Account
           </h2>
           <p className="mt-2 text-sm text-gray-300">
-            Join thousands of professionals improving their interview skills
+            Register as an interviewer to create and manage interview sessions
           </p>
         </div>
 
         {/* Registration Form */}
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           <div className="bg-white/10 backdrop-blur-lg rounded-lg p-6 space-y-4">
-            {/* Profile Picture Upload */}
+            {/* Avatar Upload */}
             <div className="space-y-3">
               <label className="block text-sm font-medium text-gray-200">
-                Profile Picture
+                Profile Avatar
               </label>
               <div className="flex items-center space-x-4">
                 <div className="relative">
                   <div className="h-20 w-20 rounded-full bg-gray-800/50 border-2 border-gray-600 flex items-center justify-center overflow-hidden">
-                    {profilePicPreview ? (
+                    {avatarPreview ? (
                       <img 
-                        src={profilePicPreview} 
-                        alt="Profile preview" 
+                        src={avatarPreview} 
+                        alt="Avatar preview" 
                         className="h-full w-full object-cover"
                       />
                     ) : (
@@ -192,12 +241,12 @@ const Register = () => {
                       </svg>
                     )}
                   </div>
-                  {profilePic && (
+                  {avatar && (
                     <button
                       type="button"
                       onClick={() => {
-                        setProfilePic(null);
-                        setProfilePicPreview(null);
+                        setAvatar(null);
+                        setAvatarPreview(null);
                       }}
                       className="absolute -top-1 -right-1 h-6 w-6 bg-red-500 rounded-full flex items-center justify-center text-white text-xs hover:bg-red-600 transition-colors"
                     >
@@ -207,36 +256,58 @@ const Register = () => {
                 </div>
                 <div className="flex-1">
                   <input
-                    id="profilePic"
-                    name="profilePic"
+                    id="avatar"
+                    name="avatar"
                     type="file"
                     accept="image/*"
-                    onChange={handleProfilePicChange}
+                    onChange={handleAvatarChange}
                     className="hidden"
                   />
                   <label
-                    htmlFor="profilePic"
+                    htmlFor="avatar"
                     className="cursor-pointer inline-flex items-center px-4 py-2 border border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-300 bg-gray-800/50 hover:bg-gray-700/50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transition-colors"
                   >
                     <svg className="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                     </svg>
-                    {profilePic ? 'Change Photo' : 'Upload Photo'}
+                    {avatar ? 'Change Avatar' : 'Upload Avatar'}
                   </label>
                   <p className="mt-1 text-xs text-gray-400">
                     JPG, PNG or GIF. Max 5MB.
                   </p>
                 </div>
               </div>
-              {errors.profilePic && (
-                <p className="text-sm text-red-400">{errors.profilePic}</p>
+              {errors.avatar && (
+                <p className="text-sm text-red-400">{errors.avatar}</p>
+              )}
+            </div>
+
+            {/* Username Field */}
+            <div>
+              <label htmlFor="username" className="block text-sm font-medium text-gray-200">
+                Username *
+              </label>
+              <input
+                id="username"
+                name="username"
+                type="text"
+                required
+                value={formData.username}
+                onChange={handleInputChange}
+                className={`mt-1 appearance-none relative block w-full px-3 py-2 border rounded-md placeholder-gray-400 text-white bg-gray-800/50 border-gray-600 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
+                  errors.username ? 'border-red-500' : ''
+                }`}
+                placeholder="adminuser"
+              />
+              {errors.username && (
+                <p className="mt-1 text-sm text-red-400">{errors.username}</p>
               )}
             </div>
 
             {/* Full Name Field */}
             <div>
               <label htmlFor="fullName" className="block text-sm font-medium text-gray-200">
-                Full Name
+                Full Name *
               </label>
               <input
                 id="fullName"
@@ -258,7 +329,7 @@ const Register = () => {
             {/* Email Field */}
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-200">
-                Email Address
+                Email Address *
               </label>
               <input
                 id="email"
@@ -271,36 +342,80 @@ const Register = () => {
                 className={`mt-1 appearance-none relative block w-full px-3 py-2 border rounded-md placeholder-gray-400 text-white bg-gray-800/50 border-gray-600 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
                   errors.email ? 'border-red-500' : ''
                 }`}
-                placeholder="john@example.com"
+                placeholder="admin@example.com"
               />
               {errors.email && (
                 <p className="mt-1 text-sm text-red-400">{errors.email}</p>
               )}
             </div>
 
-            {/* Role Selection */}
+            {/* Company Field */}
             <div>
-              <label htmlFor="role" className="block text-sm font-medium text-gray-200">
-                I am a
+              <label htmlFor="company" className="block text-sm font-medium text-gray-200">
+                Company *
               </label>
-              <select
-                id="role"
-                name="role"
-                value={formData.role}
+              <input
+                id="company"
+                name="company"
+                type="text"
+                required
+                value={formData.company}
                 onChange={handleInputChange}
-                className="mt-1 block w-full px-3 py-2 border border-gray-600 rounded-md bg-gray-800/50 text-white focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-              >
-                <option value="candidate">Job Candidate</option>
-                <option value="recruiter">Recruiter</option>
-                <option value="hiring-manager">Hiring Manager</option>
-                <option value="student">Student</option>
-              </select>
+                className={`mt-1 appearance-none relative block w-full px-3 py-2 border rounded-md placeholder-gray-400 text-white bg-gray-800/50 border-gray-600 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
+                  errors.company ? 'border-red-500' : ''
+                }`}
+                placeholder="Tech Corp Inc."
+              />
+              {errors.company && (
+                <p className="mt-1 text-sm text-red-400">{errors.company}</p>
+              )}
+            </div>
+
+            {/* Position Field */}
+            <div>
+              <label htmlFor="position" className="block text-sm font-medium text-gray-200">
+                Position
+              </label>
+              <input
+                id="position"
+                name="position"
+                type="text"
+                value={formData.position}
+                onChange={handleInputChange}
+                className="mt-1 appearance-none relative block w-full px-3 py-2 border rounded-md placeholder-gray-400 text-white bg-gray-800/50 border-gray-600 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                placeholder="Senior Interviewer / HR Manager"
+              />
+            </div>
+
+            {/* Expertise Field */}
+            <div>
+              <label className="block text-sm font-medium text-gray-200 mb-2">
+                Areas of Expertise *
+              </label>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                {expertiseOptions.map((expertise) => (
+                  <label key={expertise} className="flex items-center">
+                    <input
+                      type="checkbox"
+                      name="expertise"
+                      value={expertise}
+                      checked={formData.expertise.includes(expertise)}
+                      onChange={handleInputChange}
+                      className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-600 rounded bg-gray-800/50"
+                    />
+                    <span className="ml-2 text-sm text-gray-300">{expertise}</span>
+                  </label>
+                ))}
+              </div>
+              {errors.expertise && (
+                <p className="mt-1 text-sm text-red-400">{errors.expertise}</p>
+              )}
             </div>
 
             {/* Password Field */}
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-gray-200">
-                Password
+                Password *
               </label>
               <div className="relative">
                 <input
@@ -341,7 +456,7 @@ const Register = () => {
             {/* Confirm Password Field */}
             <div>
               <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-200">
-                Confirm Password
+                Confirm Password *
               </label>
               <div className="relative">
                 <input
@@ -427,10 +542,10 @@ const Register = () => {
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
-                  Creating account...
+                  Creating admin account...
                 </div>
               ) : (
-                'Create Account'
+                'Create Admin Account'
               )}
             </button>
           </div>
@@ -438,55 +553,16 @@ const Register = () => {
           {/* Login Link */}
           <div className="text-center">
             <p className="text-sm text-gray-300">
-              Already have an account?{' '}
-              <Link to="/login" className="font-medium text-purple-400 hover:text-purple-300 transition-colors">
+              Already have an admin account?{' '}
+              <Link to="/admin/login" className="font-medium text-purple-400 hover:text-purple-300 transition-colors">
                 Sign in here
               </Link>
             </p>
           </div>
         </form>
-
-        {/* Social Login Options */}
-        <div className="mt-6">
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-600" />
-            </div>
-            <div className="relative flex justify-center text-sm">
-              <span className="px-2 bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900 text-gray-300">
-                Or continue with
-              </span>
-            </div>
-          </div>
-
-          <div className="mt-6 grid grid-cols-2 gap-3">
-            <button
-              type="button"
-              className="w-full inline-flex justify-center py-2 px-4 border border-gray-600 rounded-md shadow-sm bg-gray-800/50 text-sm font-medium text-gray-300 hover:bg-gray-700/50 transition-colors"
-            >
-              <svg className="h-5 w-5" viewBox="0 0 24 24">
-                <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                <path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-              </svg>
-              <span className="ml-2">Google</span>
-            </button>
-
-            <button
-              type="button"
-              className="w-full inline-flex justify-center py-2 px-4 border border-gray-600 rounded-md shadow-sm bg-gray-800/50 text-sm font-medium text-gray-300 hover:bg-gray-700/50 transition-colors"
-            >
-              <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M24 4.557c-.883.392-1.832.656-2.828.775 1.017-.609 1.798-1.574 2.165-2.724-.951.564-2.005.974-3.127 1.195-.897-.957-2.178-1.555-3.594-1.555-3.179 0-5.515 2.966-4.797 6.045-4.091-.205-7.719-2.165-10.148-5.144-1.29 2.213-.669 5.108 1.523 6.574-.806-.026-1.566-.247-2.229-.616-.054 2.281 1.581 4.415 3.949 4.89-.693.188-1.452.232-2.224.084.626 1.956 2.444 3.379 4.6 3.419-2.07 1.623-4.678 2.348-7.29 2.04 2.179 1.397 4.768 2.212 7.548 2.212 9.142 0 14.307-7.721 13.995-14.646.962-.695 1.797-1.562 2.457-2.549z"/>
-              </svg>
-              <span className="ml-2">LinkedIn</span>
-            </button>
-          </div>
-        </div>
       </div>
     </div>
   );
 };
 
-export default Register;
+export default AdminRegister;

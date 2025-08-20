@@ -1,530 +1,624 @@
 import asyncHandler from "../utils/asyncHandler.js";
-import { User } from "../models/User.js";
-import { Question } from "../models/Question.js";
-import { Interview } from "../models/Interview.js";
-import { APIResponse } from "../utils/APIResponse.js";
 import { APIError } from "../utils/APIError.js";
+import { Admin } from "../models/Admin.js";
+import { InterviewSession } from "../models/interviewSession.model.js";
+import {
+  deleteImageOnCloudinary,
+  uploadPhotoOnCloudinary as uploadOnCloudinary,
+} from "../utils/cloudinary.js";
+import { APIResponse } from "../utils/APIResponse.js";
+import jwt from "jsonwebtoken";
 import mongoose from "mongoose";
 
-/**
- * @route   GET /api/admin/stats
- * @method  GET
- * @access  Admin Only
- * @desc    Get admin dashboard statistics
- */
-export const getAdminStats = asyncHandler(async (req, res) => {
-  // Get all statistics in parallel for better performance
-  const [
-    totalUsers,
-    totalQuestions,
-    totalInterviews,
-    completedInterviews,
-    recentUsers,
-    recentInterviews,
-    categoryStats
-  ] = await Promise.all([
-    // Total counts
-    User.countDocuments(),
-    Question.countDocuments(),
-    Interview.countDocuments(),
-    Interview.countDocuments({ status: "completed" }),
-    
-    // Recent activity (last 7 days)
-    User.countDocuments({
-      createdAt: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) }
-    }),
-    Interview.countDocuments({
-      createdAt: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) }
-    }),
-    
-    // Questions by category
-    Question.aggregate([
-      {
-        $group: {
-          _id: "$category",
-          count: { $sum: 1 }
-        }
-      },
-      {
-        $sort: { count: -1 }
-      }
-    ])
-  ]);
-
-  // Calculate completion rate
-  const completionRate = totalInterviews > 0 
-    ? parseFloat(((completedInterviews / totalInterviews) * 100).toFixed(2))
-    : 0;
-
-  // Format category stats
-  const formattedCategoryStats = categoryStats.map(cat => ({
-    category: cat._id,
-    questionCount: cat.count
-  }));
-
-  return res.status(200).json(
-    new APIResponse(200, {
-      overview: {
-        totalUsers,
-        totalQuestions,
-        totalInterviews,
-        completedInterviews,
-        completionRate: `${completionRate}%`
-      },
-      recentActivity: {
-        newUsersThisWeek: recentUsers,
-        newInterviewsThisWeek: recentInterviews
-      },
-      categoryBreakdown: formattedCategoryStats,
-      lastUpdated: new Date().toISOString()
-    }, "Admin dashboard statistics retrieved successfully")
-  );
-});
-
-/**
- * @route   GET /api/admin/users
- * @method  GET
- * @access  Admin Only
- * @desc    List all users with basic information
- */
-export const getAllUsers = asyncHandler(async (req, res) => {
-  const { 
-    page = 1, 
-    limit = 20, 
-    search = "", 
-    role = "", 
-    sortBy = "createdAt", 
-    sortOrder = "desc" 
-  } = req.query;
-
-  // Validate pagination parameters
-  const pageNum = parseInt(page);
-  const limitNum = parseInt(limit);
-  
-  if (pageNum < 1 || limitNum < 1 || limitNum > 100) {
-    throw new APIError(400, "Invalid pagination parameters. Page must be >= 1, limit must be between 1-100");
-  }
-
-  // Build filter object
-  const filter = {};
-  
-  // Search filter (search in username, email, and fullName)
-  if (search) {
-    filter.$or = [
-      { username: { $regex: search, $options: "i" } },
-      { email: { $regex: search, $options: "i" } },
-      { fullName: { $regex: search, $options: "i" } }
-    ];
-  }
-
-  // Role filter
-  if (role && ["user", "admin"].includes(role)) {
-    filter.role = role;
-  }
-
-  // Validate sort parameters
-  const validSortFields = ["createdAt", "username", "email", "fullName", "accountType"];
-  const validSortOrders = ["asc", "desc"];
-  
-  if (!validSortFields.includes(sortBy)) {
-    throw new APIError(400, `Invalid sort field. Must be one of: ${validSortFields.join(", ")}`);
-  }
-  
-  if (!validSortOrders.includes(sortOrder)) {
-    throw new APIError(400, "Invalid sort order. Must be 'asc' or 'desc'");
-  }
-
-  // Build sort object
-  const sort = {};
-  sort[sortBy] = sortOrder === "desc" ? -1 : 1;
-
-  // Calculate skip value for pagination
-  const skip = (pageNum - 1) * limitNum;
-
-  // Execute query with pagination
-  const users = await User.find(filter)
-    .sort(sort)
-    .skip(skip)
-    .limit(limitNum)
-    .select("_id username email fullName role accountType createdAt")
-    .lean();
-
-  // Get total count for pagination metadata
-  const totalUsers = await User.countDocuments(filter);
-  const totalPages = Math.ceil(totalUsers / limitNum);
-
-  return res.status(200).json(
-    new APIResponse(200, {
-      users,
-      pagination: {
-        currentPage: pageNum,
-        totalPages,
-        totalUsers,
-        hasNextPage: pageNum < totalPages,
-        hasPrevPage: pageNum > 1,
-      },
-    }, "Users retrieved successfully")
-  );
-});
-
-/**
- * @route   PUT /api/admin/users/:id/role
- * @method  PUT
- * @access  Admin Only
- * @desc    Update a user's role
- */
-export const updateUserRole = asyncHandler(async (req, res) => {
-  const { id } = req.params;
-  const { role } = req.body;
-
-  // Validate ObjectId format
-  if (!mongoose.Types.ObjectId.isValid(id)) {
-    throw new APIError(400, "Invalid user ID format");
-  }
-
-  // Validate role
-  if (!role || !["user", "admin"].includes(role)) {
-    throw new APIError(400, "Role must be either 'user' or 'admin'");
-  }
-
-  // Prevent admin from removing their own admin role
-  if (id === req.user._id.toString() && role === "user") {
-    throw new APIError(400, "Cannot remove your own admin privileges");
-  }
-
-  // Find and update the user
-  const updatedUser = await User.findByIdAndUpdate(
-    id,
-    { role },
-    { 
-      new: true, // Return the updated document
-      runValidators: true // Run schema validators
+// Auth
+const generateAccessAndRefreshToken = async (_id) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(_id)) {
+      throw new APIError(400, "Invalid user ID");
     }
-  ).select("_id username email fullName role accountType updatedAt");
 
-  if (!updatedUser) {
-    throw new APIError(404, "User not found");
+    const admin = await Admin.findById(_id);
+
+    if (!admin) {
+      throw new APIError(404, "Admin not found");
+    }
+
+    const accessToken = admin.generateAccessToken();
+    const refreshToken = admin.generateRefreshToken();
+
+    admin.refreshToken = refreshToken;
+    await admin.save({ validateBeforeSave: false });
+
+    return { refreshToken, accessToken };
+  } catch (error) {
+    throw new APIError(
+      500,
+      "Something went wrong while generating refresh and access token"
+    );
+  }
+};
+
+const registerAdmin = asyncHandler(async (req, res) => {
+  // Log incoming registration data for debugging
+  console.log('REGISTER BODY:', req.body);
+  console.log('REGISTER FILES:', req.files);
+
+  // Getting the data from frontend
+  let { username, password, fullName, email, company, position, expertise } = req.body;
+
+  // Validating and formatting the data
+  if (
+    [username, password, fullName, email, company].some((field) => !field || field?.trim() === "")
+  ) {
+    throw new APIError(400, "All required fields must be provided");
   }
 
-  return res.status(200).json(
-    new APIResponse(200, {
-      user: updatedUser,
-    }, `User role updated to ${role} successfully`)
+  // Parse expertise if it's a string
+  if (typeof expertise === 'string') {
+    try {
+      expertise = JSON.parse(expertise);
+    } catch (error) {
+      expertise = [];
+    }
+  }
+
+  // checking if admin exists or not
+  const adminExist = await Admin.findOne({
+    $or: [{ username: username.toLowerCase() }, { email: email.toLowerCase() }],
+  });
+
+  if (adminExist) {
+    return res
+      .status(400)
+      .json(new APIResponse(400, null, "Admin Already Exists"));
+  }
+
+  // Handling File
+  let avatarLocalPath = "";
+  if (req.files && req.files.avatar && req.files.avatar.length > 0) {
+    avatarLocalPath = req.files.avatar[0].path;
+  }
+
+  if (!avatarLocalPath) {
+    throw new APIError(400, "Avatar image is required");
+  }
+
+  // uploading on cloudinary
+  let avatarRes = await uploadOnCloudinary(avatarLocalPath);
+  if (!avatarRes) {
+    throw new APIError(500, "Failed to upload avatar to Cloudinary");
+  }
+  console.log("Avatar uploaded successfully:", avatarRes);
+
+  // Create new Admin
+  const createdAdmin = await Admin.create({
+    username: username.toLowerCase(),
+    password,
+    email: email.toLowerCase(),
+    fullName,
+    company,
+    position: position || "",
+    expertise: expertise || [],
+    avatar: avatarRes.url,
+  });
+
+  // checking if admin is created successfully
+  const adminData = await Admin.findById(createdAdmin._id).select(
+    "-password -refreshToken"
   );
+
+  if (!adminData) {
+    // Clean up the uploaded image if admin creation failed
+    await deleteImageOnCloudinary(avatarRes.public_id);
+    throw new APIError(500, "Failed to create admin account");
+  }
+
+  // Send back data to frontend
+  return res
+    .status(201)
+    .json(new APIResponse(201, adminData, "Account Created Successfully"));
 });
 
-/**
- * @route   DELETE /api/admin/users/:id
- * @method  DELETE
- * @access  Admin Only
- * @desc    Delete a user and cascade delete their interviews
- */
-export const deleteUser = asyncHandler(async (req, res) => {
-  const { id } = req.params;
+const loginAdmin = asyncHandler(async (req, res) => {
+  // data <- req.body
+  const { email, password, username } = req.body;
+  console.log('Login attempt:', { email, username });
 
-  // Validate ObjectId format
-  if (!mongoose.Types.ObjectId.isValid(id)) {
-    throw new APIError(400, "Invalid user ID format");
+  // validate
+  if ((!email && !username) || !password) {
+    throw new APIError(400, "Username or Email and password are required");
   }
 
-  // Prevent admin from deleting themselves
-  if (id === req.user._id.toString()) {
-    throw new APIError(400, "Cannot delete your own account");
+  // find Admin
+  const admin = await Admin.findOne({
+    $or: [{ email: email?.toLowerCase() }, { username: username?.toLowerCase() }],
+  });
+
+  if (!admin) {
+    return res.status(404).json(new APIResponse(404, null, "Admin not Found"));
   }
 
-  // Check if user exists
-  const user = await User.findById(id);
-  if (!user) {
-    throw new APIError(404, "User not found");
+  const isCredentialValid = await admin.isPasswordCorrect(password);
+  if (!isCredentialValid) {
+    return res
+      .status(401)
+      .json(new APIResponse(401, null, "Invalid Credentials"));
   }
 
-  // Use a transaction to ensure data consistency
-  const session = await mongoose.startSession();
-  session.startTransaction();
+  // generate and store tokens
+  const { accessToken, refreshToken } = await generateAccessAndRefreshToken(
+    admin._id
+  );
+
+  const loggedInAdmin = await Admin.findById(admin._id).select(
+    "-password -refreshToken"
+  );
+
+  // Set cookies
+  const cookieOptions = {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: process.env.NODE_ENV === 'production' ? 'None' : 'Lax',
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+  };
+
+  res.cookie('accessToken', accessToken, cookieOptions);
+  res.cookie('refreshToken', refreshToken, cookieOptions);
+
+  return res
+    .status(200)
+    .json(
+      new APIResponse(
+        200,
+        { admin: loggedInAdmin, accessToken, refreshToken },
+        "Logged In Successfully"
+      )
+    );
+});
+
+const logoutAdmin = asyncHandler(async (req, res) => {
+  await Admin.findByIdAndUpdate(
+    req.admin._id,
+    {
+      $unset: {
+        refreshToken: 1,
+      },
+    }
+  );
+
+  // Clear cookies
+  res.clearCookie('accessToken', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: process.env.NODE_ENV === 'production' ? 'None' : 'Lax',
+  });
+  
+  res.clearCookie('refreshToken', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: process.env.NODE_ENV === 'production' ? 'None' : 'Lax',
+  });
+
+  return res
+    .status(200)
+    .json(new APIResponse(200, null, "Logged out Successfully"));
+});
+
+const refreshAccessToken = asyncHandler(async (req, res) => {
+  const incomingRefreshToken = req.cookies.refreshToken || req.body.refreshToken;
+
+  if (!incomingRefreshToken) {
+    throw new APIError(401, "Refresh token is required");
+  }
 
   try {
-    // Delete all interviews created by this user
-    const deletedInterviews = await Interview.deleteMany(
-      { user: id },
-      { session }
+    const decodedRefreshToken = jwt.verify(
+      incomingRefreshToken,
+      process.env.REFRESH_TOKEN_SECRET
     );
 
-    // Remove user from interview history in other users' records
-    await User.updateMany(
-      { "interviewHistory.interview": { $in: deletedInterviews.map(i => i._id) } },
-      { $pull: { interviewHistory: { interview: { $in: deletedInterviews.map(i => i._id) } } } },
-      { session }
+    const admin = await Admin.findById(decodedRefreshToken._id);
+
+    if (!admin || incomingRefreshToken !== admin.refreshToken) {
+      throw new APIError(401, "Invalid refresh token");
+    }
+
+    const { accessToken, refreshToken: newRefreshToken } = await generateAccessAndRefreshToken(
+      admin._id
     );
 
-    // Delete the user
-    await User.findByIdAndDelete(id, { session });
+    const cookieOptions = {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'None' : 'Lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    };
 
-    // Commit the transaction
-    await session.commitTransaction();
+    res.cookie('accessToken', accessToken, cookieOptions);
+    res.cookie('refreshToken', newRefreshToken, cookieOptions);
 
-    return res.status(200).json(
-      new APIResponse(200, {
-        deletedUserId: id,
-        deletedInterviewsCount: deletedInterviews.length,
-      }, "User and associated data deleted successfully")
+    return res
+      .status(200)
+      .json(
+        new APIResponse(
+          200,
+          { accessToken, refreshToken: newRefreshToken },
+          "Access Token Refreshed Successfully"
+        )
+      );
+  } catch (error) {
+    throw new APIError(401, error.message || "Invalid refresh token");
+  }
+});
+
+// Profile
+const getCurrentAdmin = asyncHandler(async (req, res) => {
+  return res
+    .status(200)
+    .json(new APIResponse(200, req.admin, "Admin fetched Successfully"));
+});
+
+const updateAdminProfile = asyncHandler(async (req, res) => {
+  try {
+    const { fullName, company, position, expertise } = req.body;
+    const adminId = req.admin._id;
+
+    // Build update object
+    const updateData = {};
+    if (fullName) updateData.fullName = fullName;
+    if (company) updateData.company = company;
+    if (position) updateData.position = position;
+    if (expertise) {
+      updateData.expertise = typeof expertise === 'string' 
+        ? JSON.parse(expertise) 
+        : expertise;
+    }
+
+    // Handle avatar upload if provided
+    if (req.files && req.files.avatar && req.files.avatar.length > 0) {
+      const avatarLocalPath = req.files.avatar[0].path;
+      const avatarRes = await uploadOnCloudinary(avatarLocalPath);
+      
+      if (avatarRes) {
+        // Delete old avatar from Cloudinary if exists
+        if (req.admin.avatar) {
+          const publicId = req.admin.avatar.split('/').pop().split('.')[0];
+          await deleteImageOnCloudinary(publicId);
+        }
+        updateData.avatar = avatarRes.url;
+      }
+    }
+
+    const updatedAdmin = await Admin.findByIdAndUpdate(
+      adminId,
+      updateData,
+      { new: true, runValidators: true }
+    ).select("-password -refreshToken");
+
+    return res
+      .status(200)
+      .json(new APIResponse(200, updatedAdmin, "Profile updated successfully"));
+  } catch (error) {
+    console.error("Error updating admin profile:", error);
+    throw new APIError(500, "Failed to update profile");
+  }
+});
+
+const changeAdminPassword = asyncHandler(async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    const adminId = req.admin._id;
+
+    if (!currentPassword || !newPassword) {
+      throw new APIError(400, "Current password and new password are required");
+    }
+
+    const admin = await Admin.findById(adminId);
+    const isCurrentPasswordValid = await admin.isPasswordCorrect(currentPassword);
+
+    if (!isCurrentPasswordValid) {
+      throw new APIError(401, "Current password is incorrect");
+    }
+
+    admin.password = newPassword;
+    await admin.save({ validateBeforeSave: false });
+
+    return res
+      .status(200)
+      .json(new APIResponse(200, null, "Password changed successfully"));
+  } catch (error) {
+    console.error("Error changing password:", error);
+    throw new APIError(500, "Failed to change password");
+  }
+});
+
+// Interview Sessions
+const createInterviewSession = asyncHandler(async (req, res) => {
+  try {
+    const {
+      title,
+      description,
+      candidateName,
+      candidateEmail,
+      position,
+      scheduledDate,
+      duration,
+      questions,
+      difficulty,
+      categories
+    } = req.body;
+
+    // Validate required fields
+    if (!title || !candidateName || !candidateEmail || !position) {
+      return res.status(400).json(
+        new APIResponse(400, null, "Title, candidate name, candidate email, and position are required")
+      );
+    }
+
+    // Validate scheduled date if provided
+    if (scheduledDate && new Date(scheduledDate) < new Date()) {
+      return res.status(400).json(
+        new APIResponse(400, null, "Scheduled date must be in the future")
+      );
+    }
+
+    // Get the admin who is creating the session
+    const adminId = req.admin._id;
+
+    // Create the interview session
+    const interviewSession = new InterviewSession({
+      title,
+      description: description || "",
+      candidate: {
+        name: candidateName,
+        email: candidateEmail
+      },
+      position,
+      interviewer: adminId,
+      scheduledDate: scheduledDate || null,
+      duration: duration || 30, // default 30 minutes
+      questions: questions || [],
+      difficulty: difficulty || "medium",
+      categories: categories || [],
+      status: scheduledDate ? "scheduled" : "draft"
+    });
+
+    // Save to database
+    const savedSession = await interviewSession.save();
+
+    // Populate interviewer details
+    await savedSession.populate("interviewer", "username email fullName avatar");
+
+    // Add to admin's pastSessions
+    await Admin.findByIdAndUpdate(
+      adminId,
+      {
+        $push: {
+          pastSessions: {
+            interview: savedSession._id,
+            date: new Date()
+          }
+        }
+      }
+    );
+
+    return res.status(201).json(
+      new APIResponse(201, savedSession, "Interview session created successfully")
     );
 
   } catch (error) {
-    // Rollback the transaction on error
-    await session.abortTransaction();
-    throw error;
-  } finally {
-    // End the session
-    session.endSession();
+    console.error("Error creating interview session:", error);
+    return res.status(500).json(
+      new APIResponse(500, null, "Internal server error while creating interview session")
+    );
   }
 });
 
-/**
- * @route   GET /api/admin/users/:id
- * @method  GET
- * @access  Admin Only
- * @desc    Get detailed user information including interview history
- */
-export const getUserDetails = asyncHandler(async (req, res) => {
-  const { id } = req.params;
+// Get all interview sessions for an admin
+const getAdminInterviewSessions = asyncHandler(async (req, res) => {
+  try {
+    const adminId = req.admin._id;
+    const { status, page = 1, limit = 10 } = req.query;
 
-  // Validate ObjectId format
-  if (!mongoose.Types.ObjectId.isValid(id)) {
-    throw new APIError(400, "Invalid user ID format");
+    const filter = { interviewer: adminId };
+    if (status && status !== 'all') {
+      filter.status = status;
+    }
+
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const skip = (pageNum - 1) * limitNum;
+
+    const sessions = await InterviewSession.find(filter)
+      .sort({ createdAt: -1 })
+      .limit(limitNum)
+      .skip(skip)
+      .populate("interviewer", "username fullName avatar");
+
+    const total = await InterviewSession.countDocuments(filter);
+
+    return res.status(200).json(
+      new APIResponse(200, {
+        sessions,
+        totalPages: Math.ceil(total / limitNum),
+        currentPage: pageNum,
+        total
+      }, "Interview sessions retrieved successfully")
+    );
+
+  } catch (error) {
+    console.error("Error fetching interview sessions:", error);
+    return res.status(500).json(
+      new APIResponse(500, null, "Internal server error while fetching interview sessions")
+    );
   }
+});
 
-  // Find user with populated interview history
-  const user = await User.findById(id)
-    .select("-password -refreshToken")
-    .populate({
-      path: "interviewHistory.interview",
-      select: "category status score completedAt createdAt",
-      options: { sort: { createdAt: -1 } }
-    })
-    .lean();
+// Get single interview session by ID
+const getInterviewSession = asyncHandler(async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    const adminId = req.admin._id;
 
-  if (!user) {
-    throw new APIError(404, "User not found");
+    const session = await InterviewSession.findOne({
+      _id: sessionId,
+      interviewer: adminId
+    }).populate("interviewer", "username fullName avatar expertise");
+
+    if (!session) {
+      return res.status(404).json(
+        new APIResponse(404, null, "Interview session not found")
+      );
+    }
+
+    return res.status(200).json(
+      new APIResponse(200, session, "Interview session retrieved successfully")
+    );
+
+  } catch (error) {
+    console.error("Error fetching interview session:", error);
+    return res.status(500).json(
+      new APIResponse(500, null, "Internal server error while fetching interview session")
+    );
   }
+});
 
-  // Calculate user statistics
-  const interviewStats = {
-    totalInterviews: user.interviewHistory.length,
-    completedInterviews: user.interviewHistory.filter(h => h.interview?.status === "completed").length,
-    averageScore: 0,
-    recentActivity: user.interviewHistory.filter(h => {
-      const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-      return h.createdAt >= weekAgo;
-    }).length
-  };
+// Update interview session
+const updateInterviewSession = asyncHandler(async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    const adminId = req.admin._id;
+    const updates = req.body;
 
-  // Calculate average score from completed interviews
-  const completedInterviews = user.interviewHistory.filter(h => h.interview?.status === "completed");
-  if (completedInterviews.length > 0) {
-    const totalScore = completedInterviews.reduce((sum, h) => sum + (h.interview?.score || 0), 0);
-    interviewStats.averageScore = parseFloat((totalScore / completedInterviews.length).toFixed(2));
+    // Check if session exists and belongs to admin
+    const existingSession = await InterviewSession.findOne({
+      _id: sessionId,
+      interviewer: adminId
+    });
+
+    if (!existingSession) {
+      return res.status(404).json(
+        new APIResponse(404, null, "Interview session not found")
+      );
+    }
+
+    // Prevent updating certain fields
+    delete updates._id;
+    delete updates.interviewer;
+    delete updates.createdAt;
+
+    const updatedSession = await InterviewSession.findByIdAndUpdate(
+      sessionId,
+      updates,
+      { new: true, runValidators: true }
+    ).populate("interviewer", "username fullName avatar");
+
+    return res.status(200).json(
+      new APIResponse(200, updatedSession, "Interview session updated successfully")
+    );
+
+  } catch (error) {
+    console.error("Error updating interview session:", error);
+    return res.status(500).json(
+      new APIResponse(500, null, "Internal server error while updating interview session")
+    );
   }
+});
 
-  return res.status(200).json(
-    new APIResponse(200, {
-      user: {
-        _id: user._id,
-        username: user.username,
-        email: user.email,
-        fullName: user.fullName,
-        role: user.role,
-        accountType: user.accountType,
-        avatar: user.avatar,
-        description: user.description,
-        createdAt: user.createdAt,
-        updatedAt: user.updatedAt
+// Delete interview session
+const deleteInterviewSession = asyncHandler(async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    const adminId = req.admin._id;
+
+    const session = await InterviewSession.findOneAndDelete({
+      _id: sessionId,
+      interviewer: adminId
+    });
+
+    if (!session) {
+      return res.status(404).json(
+        new APIResponse(404, null, "Interview session not found")
+      );
+    }
+
+    // Remove from admin's pastSessions
+    await Admin.findByIdAndUpdate(
+      adminId,
+      {
+        $pull: {
+          pastSessions: { interview: sessionId }
+        }
+      }
+    );
+
+    return res.status(200).json(
+      new APIResponse(200, null, "Interview session deleted successfully")
+    );
+
+  } catch (error) {
+    console.error("Error deleting interview session:", error);
+    return res.status(500).json(
+      new APIResponse(500, null, "Internal server error while deleting interview session")
+    );
+  }
+});
+
+// Update session status
+const updateSessionStatus = asyncHandler(async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    const { status } = req.body;
+    const adminId = req.admin._id;
+
+    const validStatuses = ["draft", "scheduled", "in-progress", "completed", "cancelled"];
+    
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json(
+        new APIResponse(400, null, "Invalid status value")
+      );
+    }
+
+    const session = await InterviewSession.findOneAndUpdate(
+      {
+        _id: sessionId,
+        interviewer: adminId
       },
-      interviewStats,
-      recentInterviews: user.interviewHistory.slice(0, 5) // Last 5 interviews
-    }, "User details retrieved successfully")
-  );
-});
+      { status },
+      { new: true, runValidators: true }
+    );
 
-/**
- * @route   GET /api/admin/backup
- * @method  GET
- * @access  Admin Only
- * @desc    Export all users, questions, and interviews as JSON for backup
- */
-export const backupDatabase = asyncHandler(async (req, res) => {
-  const users = await User.find().lean();
-  const questions = await Question.find().lean();
-  const interviews = await Interview.find().lean();
+    if (!session) {
+      return res.status(404).json(
+        new APIResponse(404, null, "Interview session not found")
+      );
+    }
 
-  const backup = {
-    users,
-    questions,
-    interviews,
-    backupDate: new Date().toISOString()
-  };
+    return res.status(200).json(
+      new APIResponse(200, session, "Session status updated successfully")
+    );
 
-  res.setHeader('Content-Disposition', 'attachment; filename="backup.json"');
-  res.setHeader('Content-Type', 'application/json');
-  return res.status(200).send(JSON.stringify(backup, null, 2));
-});
-
-/**
- * @route   POST /api/admin/clear-cache
- * @method  POST
- * @access  Admin Only
- * @desc    Clear system cache (simulate or clear Redis if available)
- */
-export const clearSystemCache = asyncHandler(async (req, res) => {
-  // If using Redis, clear all keys (simulate here)
-  // If you have a Redis client, you can use: await redisClient.flushall();
-  // For now, just simulate
-  // TODO: Integrate with actual cache if present
-
-  return res.status(200).json(
-    new APIResponse(200, {}, "System cache cleared successfully (simulated)")
-  );
-});
-
-/**
- * @route   GET /api/admin/users/:id/export
- * @method  GET
- * @access  Admin Only
- * @desc    Export a specific user's data as JSON
- */
-export const exportUserData = asyncHandler(async (req, res) => {
-  const { id } = req.params;
-
-  if (!mongoose.Types.ObjectId.isValid(id)) {
-    throw new APIError(400, "Invalid user ID format");
+  } catch (error) {
+    console.error("Error updating session status:", error);
+    return res.status(500).json(
+      new APIResponse(500, null, "Internal server error while updating session status")
+    );
   }
-
-  const user = await User.findById(id).select('-password -refreshToken').lean();
-  if (!user) {
-    throw new APIError(404, "User not found");
-  }
-
-  const interviews = await Interview.find({ user: id }).lean();
-
-  const exportData = {
-    user,
-    interviews
-  };
-
-  res.setHeader('Content-Disposition', `attachment; filename="user_${id}_data.json"`);
-  res.setHeader('Content-Type', 'application/json');
-  return res.status(200).send(JSON.stringify(exportData, null, 2));
 });
 
-/**
- * @route   GET /api/admin/stats/system
- * @method  GET
- * @access  Admin Only
- * @desc    Get system performance statistics (stub)
- */
-export const getSystemStats = asyncHandler(async (req, res) => {
-  return res.status(200).json(
-    new APIResponse(200, {
-      cpuUsage: '5%',
-      memoryUsage: '512MB',
-      uptime: process.uptime(),
-      timestamp: new Date().toISOString()
-    }, "System stats (simulated)")
-  );
-});
-
-/**
- * @route   GET /api/admin/activity
- * @method  GET
- * @access  Admin Only
- * @desc    Get recent system activity (stub)
- */
-export const getRecentActivity = asyncHandler(async (req, res) => {
-  return res.status(200).json(
-    new APIResponse(200, {
-      activities: [
-        { type: 'login', user: 'admin', timestamp: new Date().toISOString() },
-        { type: 'user_created', user: 'user1', timestamp: new Date().toISOString() }
-      ]
-    }, "Recent activity (simulated)")
-  );
-});
-
-/**
- * @route   GET /api/admin/stats/interviews
- * @method  GET
- * @access  Admin Only
- * @desc    Get interview-specific statistics (stub)
- */
-export const getInterviewStats = asyncHandler(async (req, res) => {
-  return res.status(200).json(
-    new APIResponse(200, {
-      totalInterviews: 100,
-      averageScore: 75,
-      completed: 80,
-      inProgress: 20
-    }, "Interview stats (simulated)")
-  );
-});
-
-/**
- * @route   GET /api/admin/stats/subscriptions
- * @method  GET
- * @access  Admin Only
- * @desc    Get subscription-specific statistics (stub)
- */
-export const getSubscriptionStats = asyncHandler(async (req, res) => {
-  return res.status(200).json(
-    new APIResponse(200, {
-      totalSubscriptions: 50,
-      active: 40,
-      expired: 10
-    }, "Subscription stats (simulated)")
-  );
-});
-
-/**
- * @route   PUT /api/admin/settings
- * @method  PUT
- * @access  Admin Only
- * @desc    Update system settings (stub)
- */
-export const updateSystemSettings = asyncHandler(async (req, res) => {
-  // Accept settings in req.body, simulate update
-  return res.status(200).json(
-    new APIResponse(200, { updated: true, settings: req.body }, "System settings updated (simulated)")
-  );
-});
-
-/**
- * @route   GET /api/admin/logs
- * @method  GET
- * @access  Admin Only
- * @desc    Get system logs (stub)
- */
-export const getSystemLogs = asyncHandler(async (req, res) => {
-  return res.status(200).json(
-    new APIResponse(200, {
-      logs: [
-        { level: 'info', message: 'System started', timestamp: new Date().toISOString() },
-        { level: 'warn', message: 'High memory usage', timestamp: new Date().toISOString() }
-      ]
-    }, "System logs (simulated)")
-  );
-});
-
-/**
- * @route   GET /api/admin/stats/questions
- * @method  GET
- * @access  Admin Only
- * @desc    Get question-specific statistics (stub)
- */
-export const getQuestionStats = asyncHandler(async (req, res) => {
-  return res.status(200).json(
-    new APIResponse(200, {
-      totalQuestions: 1000,
-      averageScore: 75,
-      completed: 800,
-      inProgress: 200
-    }, "Question stats (simulated)")
-  );
-});
+// Export all functions
+export {
+  registerAdmin,
+  loginAdmin,
+  logoutAdmin,
+  refreshAccessToken,
+  getCurrentAdmin,
+  updateAdminProfile,
+  changeAdminPassword,
+  createInterviewSession,
+  getAdminInterviewSessions,
+  getInterviewSession,
+  updateInterviewSession,
+  deleteInterviewSession,
+  updateSessionStatus
+};

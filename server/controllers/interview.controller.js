@@ -1,8 +1,6 @@
 // controllers/interview.controller.js
 import asyncHandler from "../utils/asyncHandler.js";
-import { Interview } from "../models/Interview.js";
 import { User } from "../models/User.js";
-import { Question } from "../models/Question.js";
 import { APIResponse } from "../utils/APIResponse.js";
 import { APIError } from "../utils/APIError.js";
 import { evaluateAnswerWithAI } from "../utils/aiEvaluator.js";

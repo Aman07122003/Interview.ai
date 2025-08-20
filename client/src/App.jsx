@@ -9,12 +9,15 @@ import Dashboard from "./pages/Dashboard";
 import AddQuestions from "./pages/AddQuestions";
 import Admin from "./pages/Admin";
 import CandidatesPage from "./pages/CandidatesPage";
-import Register from "./pages/Register";
+import UserRegister from "./pages/UserRegister";
 import Login from "./pages/Login";
 import Profile from "./pages/Profile";
 import SubscriptionPage from "./pages/Subscription/SubscriptionPage";
 import PaymentFailure from "./pages/Subscription/PaymentFailure";
 import PaymentSuccess from "./pages/Subscription/PaymentSuccess";
+import RoleRegister from "./pages/RoleRegister";
+import AdminRegister from "./pages/AdminRegister";
+
 
 function App() {
   
@@ -52,12 +55,14 @@ function App() {
         <Route path="/add-questions" element={<AddQuestions />} />
         <Route path="/admin" element={<Admin />} />
         <Route path="/candidates" element={<CandidatesPage />} />
-        <Route path="/register" element={<Register />} />
+        <Route path="/user-register" element={<UserRegister />} />
         <Route path="/login" element={<Login />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/subscription" element={<SubscriptionPage />} />
         <Route path="/subscription/payment-success" element={<PaymentSuccess />} />
         <Route path="/subscription/payment-failure" element={<PaymentFailure />} />
+        <Route path="/selectRole" element={<RoleRegister/>} />
+        <Route path="/admin-register" element={<AdminRegister/>} />
       </Routes>
     </Router>
   )

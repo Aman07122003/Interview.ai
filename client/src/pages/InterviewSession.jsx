@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, use } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { startInterview } from '../services/api/interview';
 import { useNavigate } from 'react-router-dom';
 import { getQuestion } from '../services/api/question';
@@ -21,7 +21,6 @@ const InterviewSession = () => {
   const textareaRef = useRef(null);
   const timerRef = useRef(null);
 
-  
   const [questions, setQuestions] = useState([]);
   const [error, setError] = useState(null);
 
@@ -38,11 +37,10 @@ const InterviewSession = () => {
         } catch (err) {
             setError('Failed to fetch questions. Please try again later.');
             setIsLoading(false);
-
         }
     };
     fetchQuestions();
-    }, []);
+  }, []);
 
   // Mock AI feedback generator
   const generateFeedback = (answer, question) => {
@@ -154,9 +152,8 @@ const InterviewSession = () => {
     }
   };
 
- 
-   // Handle interview end
-   const handleEndInterview = () => {
+  // Handle interview end
+  const handleEndInterview = () => {
     if (window.confirm('Are you sure you want to end the interview?')) {
       setInterviewStarted(false);
       setCurrentQuestionIndex(0);
@@ -169,7 +166,7 @@ const InterviewSession = () => {
   };
 
   // Calculate progress
-  const progress = ((currentQuestionIndex + 1) / questions.length) * 100;
+  const progress = questions.length > 0 ? ((currentQuestionIndex + 1) / questions.length) * 100 : 0;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900">
@@ -207,62 +204,52 @@ const InterviewSession = () => {
         {/* Left Panel - Chat and Questions */}
         <div className="flex-1 lg:w-2/3 p-8 overflow-hidden">
           <div className="h-full flex flex-col space-y-8">
-           {/* Question Display */}
-                {questions.length > 0 && questions[currentQuestionIndex] && (
-                <div className="bg-gray-800/30 backdrop-blur-md rounded-3xl p-8 border border-gray-700/30 shadow-xl">
-                    <div className="flex items-center justify-between mb-6">
-                    <div className="flex items-center space-x-3">
-                        <span className="px-4 py-2 bg-purple-600/20 text-purple-300 rounded-xl text-sm font-medium border border-purple-500/30">
-                        {questions[currentQuestionIndex].category}
-                        </span>
-                        <span className="px-4 py-2 bg-gray-600/20 text-gray-300 rounded-xl text-sm font-medium border border-gray-500/30">
-                        {questions[currentQuestionIndex].difficulty}
-                        </span>
+            {/* Question Display */}
+            {questions.length > 0 && questions[currentQuestionIndex] && (
+              <div className="bg-gray-800/30 backdrop-blur-md rounded-3xl p-8 border border-gray-700/30 shadow-xl">
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center space-x-3">
+                    <span className="px-4 py-2 bg-purple-600/20 text-purple-300 rounded-xl text-sm font-medium border border-purple-500/30">
+                      {questions[currentQuestionIndex].category || 'General'}
+                    </span>
+                    <span className="px-4 py-2 bg-gray-600/20 text-gray-300 rounded-xl text-sm font-medium border border-gray-500/30">
+                      {questions[currentQuestionIndex].difficulty || 'Medium'}
+                    </span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-gray-400 text-sm font-medium">Question</span>
+                    <div className="text-2xl font-bold text-purple-400">
+                      {currentQuestionIndex + 1} <span className="text-gray-400 text-lg">/ {questions.length}</span>
                     </div>
-                    <div className="text-right">
-                        <span className="text-gray-400 text-sm font-medium">Question</span>
-                        <div className="text-2xl font-bold text-purple-400">
-                        {currentQuestionIndex + 1} <span className="text-gray-400 text-lg">/ {questions.length}</span>
-                        </div>
-                    </div>
-                    </div>
-
-                    <h2 className="text-2xl font-bold text-white leading-relaxed">
-                    {questions[currentQuestionIndex].questionText}
-                    </h2>
-
-                    {/* Optional metadata */}
-                    <div className="mt-4 text-sm text-gray-400">
-                    <p><strong>Type:</strong> {questions[currentQuestionIndex].questionType}</p>
-                    <p><strong>Estimated Time:</strong> {questions[currentQuestionIndex].estimatedTime} min</p>
-                    </div>
+                  </div>
                 </div>
-                )}
 
-            <div  className="bg-gray-800/30 backdrop-blur-md rounded-3xl p-8 border border-gray-700/30 shadow-xl">
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center space-x-3">
-                  <span className="px-4 py-2 bg-purple-600/20 text-purple-300 rounded-xl text-sm font-medium border border-purple-500/30">
-                    {questions}
-                  </span>
-                  <span className="px-4 py-2 bg-gray-600/20 text-gray-300 rounded-xl text-sm font-medium border border-gray-500/30">
-                    {questions[currentQuestionIndex]}
-                  </span>
+                <h2 className="text-2xl font-bold text-white leading-relaxed">
+                  {questions[currentQuestionIndex].questionText || questions[currentQuestionIndex].question}
+                </h2>
+
+                {/* Optional metadata */}
+                <div className="mt-4 text-sm text-gray-400">
+                  <p><strong>Type:</strong> {questions[currentQuestionIndex].questionType || 'Technical'}</p>
+                  <p><strong>Estimated Time:</strong> {questions[currentQuestionIndex].estimatedTime || 5} min</p>
                 </div>
-                <div className="text-right">
-                  <span className="text-gray-400 text-sm font-medium">Question</span>
-                  <div className="text-2xl font-bold text-purple-400">
-                    {currentQuestionIndex + 1} <span className="text-gray-400 text-lg">/ {questions.length}</span>
+              </div>
+            )}
+
+            {/* Loading state */}
+            {questions.length === 0 && (
+              <div className="bg-gray-800/30 backdrop-blur-md rounded-3xl p-8 border border-gray-700/30 shadow-xl">
+                <div className="flex items-center justify-center h-40">
+                  <div className="text-center">
+                    <div className="w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                    <p className="text-gray-300">Loading questions...</p>
                   </div>
                 </div>
               </div>
-              <h2 className="text-2xl font-bold text-white leading-relaxed">
-                {questions[currentQuestionIndex].question}
-              </h2>
-            </div>
+            )}
 
             {/* Answer Input */}
-            {!showFeedback && (
+            {!showFeedback && questions.length > 0 && (
               <div className="flex-1 flex flex-col">
                 <div className="bg-gray-800/30 backdrop-blur-md rounded-3xl p-8 border border-gray-700/30 shadow-xl flex-1 flex flex-col">
                   <div className="flex items-center justify-between mb-6">

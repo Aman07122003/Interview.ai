@@ -1,6 +1,5 @@
 // controllers/question.controller.js
 import asyncHandler from "../utils/asyncHandler.js";
-import { Question } from "../models/Question.js";
 import { APIResponse } from "../utils/APIResponse.js";
 import { APIError } from "../utils/APIError.js";
 import mongoose from "mongoose";
