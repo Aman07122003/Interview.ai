@@ -1,344 +1,351 @@
-// controllers/interview.controller.js
 import asyncHandler from "../utils/asyncHandler.js";
-import { User } from "../models/User.js";
-import { APIResponse } from "../utils/APIResponse.js";
 import { APIError } from "../utils/APIError.js";
-import { evaluateAnswerWithAI } from "../utils/aiEvaluator.js";
-import mongoose from "mongoose";
+import { APIResponse } from "../utils/APIResponse.js";
+import { Result } from "../models/result.model.js";
+import { User } from "../models/User.js";
+import { InterviewSession } from "../models/interviewSession.model.js";
+import OpenAI from "openai";
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
 
 export const startInterview = asyncHandler(async (req, res) => {
   const userId = req.user._id;
-  const { category } = req.body;
+  const { sessionId } = req.params;
 
-  if (!category) {
-    throw new APIError(400, "Category is required to start an interview");
+  // 1. Find the interview session
+  const session = await InterviewSession.findById(sessionId)
+    .populate("createdBy", "_id username email fullName avatar")
+    .populate("participants", "_id email fullName");
+
+  if (!session) {
+    throw new APIError(404, "Interview session not found");
   }
 
-  // 1. Get 10 random questions from the category
-  const questions = await Question.aggregate([
-    { $match: { category } },
-    { $sample: { size: 10 } },
-    {
-      $project: {
-        _id: 1,
-        questionText: 1,
-      },
-    },
-  ]);
+  // 2. Check if user is a participant
+  const isParticipant = session.participants.some(
+    participant => participant._id.toString() === userId.toString()
+  );
+  
+  if (!isParticipant) {
+    throw new APIError(403, "You are not a participant of this interview session");
+  }
 
-  if (!questions.length || questions.length < 10) {
-    throw new APIError(
-      404,
-      `Not enough questions found for category "${category}". At least 10 are required.`
+  // 3. Check if result already exists
+  const existingResult = await Result.findOne({
+    interview: sessionId,
+    candidate: userId,
+    status: { $in: ["in-progress", "completed"] }
+  });
+
+  if (existingResult) {
+    return res.status(200).json(
+      new APIResponse(
+        200,
+        {
+          resultId: existingResult._id,
+          interviewId: session._id,
+          title: session.title,
+          description: session.description,
+          createdBy: session.createdBy,
+          expertise: session.expertise,
+          type: session.type,
+          scheduledAt: session.scheduledAt,
+          questions: session.questions.map((q) => ({
+            questionId: q._id,
+            text: q.text,
+          })),
+          status: existingResult.status
+        },
+        existingResult.status === "in-progress" 
+          ? "Resuming existing interview" 
+          : "Interview already completed"
+      )
     );
   }
 
-  // 2. Format for interview schema
-  const formattedQuestions = questions.map((q) => ({
+  // 4. Prepare responses from session questions
+  const responses = session.questions.map((q) => ({
+    question: q.text,
     questionId: q._id,
-    questionText: q.questionText,
-    answerText: null,
-    aiFeedback: null,
-    score: null,
+    answer: "",
+    maxMarks: 10,
+    obtainedMarks: 0,
+    feedback: "",
+    timeTaken: 0
   }));
 
-  // 3. Create interview session
-  const interview = await Interview.create({
-    user: userId,
-    category,
-    questions: formattedQuestions,
-    status: "in-progress",
+  // 5. Create result doc for this interview attempt
+  const result = await Result.create({
+    interview: session._id,
+    candidate: userId,
+    conductedBy: session.createdBy._id,
+    responses,
+    status: "in-progress"
   });
 
-  // 4. Link interview to user's history
+  // 6. Link result to user's interview history
   await User.findByIdAndUpdate(userId, {
     $push: {
       interviewHistory: {
-        interview: interview._id,
+        interview: session._id,
+        result: result._id,
+        date: new Date()
       },
     },
   });
 
-  // 5. Return interview session (excluding answers, feedback, scores)
-  return res
-    .status(201)
-    .json(
-      new APIResponse(
-        201,
-        {
-          interviewId: interview._id,
-          category: interview.category,
-          questions: interview.questions.map((q) => ({
-            questionId: q.questionId,
-            questionText: q.questionText,
-          })),
-        },
-        "Interview started successfully"
-      )
-    );
+  // 7. Send back interview to start
+  return res.status(201).json(
+    new APIResponse(
+      201,
+      {
+        resultId: result._id,
+        interviewId: session._id,
+        title: session.title,
+        description: session.description,
+        createdBy: session.createdBy,
+        expertise: session.expertise,
+        type: session.type,
+        scheduledAt: session.scheduledAt,
+        questions: session.questions.map((q) => ({
+          questionId: q._id,
+          text: q.text,
+        })),
+        status: "in-progress"
+      },
+      "Interview started successfully"
+    )
+  );
 });
-
 
 export const submitAnswer = asyncHandler(async (req, res) => {
   const userId = req.user._id;
-  const { interviewId, questionId, answerText } = req.body;
+  const { resultId, questionId, answerText, timeTaken } = req.body;
 
-  if (!interviewId || !questionId || !answerText) {
-    throw new APIError(400, "interviewId, questionId, and answerText are required");
+  if (!resultId || !questionId || !answerText) {
+    throw new APIError(400, "resultId, questionId, and answerText are required");
   }
 
-  // 1. Fetch the interview and validate ownership
-  const interview = await Interview.findOne({
-    _id: interviewId,
-    user: userId,
-    status: "in-progress",
+  // 1. Fetch result doc for this candidate
+  const result = await Result.findOne({
+    _id: resultId,
+    candidate: userId,
+    status: "in-progress"
   });
 
-  if (!interview) {
-    throw new APIError(404, "Interview not found or already completed");
+  if (!result) {
+    throw new APIError(404, "Active interview session not found");
   }
 
-  // 2. Find the question entry inside interview
-  const questionEntry = interview.questions.find(
-    (q) => q.questionId.toString() === questionId
+  // 2. Find the question entry by questionId
+  const questionEntry = result.responses.find(
+    (response) => response.questionId.toString() === questionId
   );
 
   if (!questionEntry) {
-    throw new APIError(404, "Question not found in interview");
+    throw new APIError(404, "Question not found in this interview");
   }
 
-  if (questionEntry.answerText) {
-    throw new APIError(400, "Answer for this question has already been submitted");
-  }
+  // 3. Update the answer and time taken
+  questionEntry.answer = answerText;
+  questionEntry.timeTaken = timeTaken || 0;
 
-  // TODO: Sanitize user input to prevent prompt injection attacks when interacting with AI
-  // 3. Evaluate answer via AI (placeholder logic)
-  const { score, feedback } = await evaluateAnswerWithAI(
-    questionEntry.questionText,
-    answerText
+  await result.save();
+
+  // 4. Check if all questions are answered
+  const allAnswered = result.responses.every(response => 
+    response.answer && response.answer.trim() !== ""
   );
 
-  // 4. AI response safety check
-  if (score === null || score === undefined || feedback === null || feedback === undefined) {
-    throw new APIError(500, "AI failed to evaluate the answer");
-  }
-
-  // 5. Save answer, feedback, and score
-  questionEntry.answerText = answerText;
-  questionEntry.aiFeedback = feedback;
-  questionEntry.score = score;
-
-  await interview.save();
-
-  // 6. Respond to frontend
   return res.status(200).json(
-    new APIResponse(200, {
-      questionId,
-      score,
-      aiFeedback: feedback,
-    }, "Answer submitted and evaluated successfully")
+    new APIResponse(
+      200,
+      {
+        resultId: result._id,
+        questionId,
+        answer: questionEntry.answer,
+        allQuestionsAnswered: allAnswered,
+        progress: `${result.responses.filter(r => r.answer.trim() !== "").length}/${result.responses.length}`
+      },
+      "Answer submitted successfully"
+    )
   );
 });
 
 export const submitInterview = asyncHandler(async (req, res) => {
   const userId = req.user._id;
-  const { interviewId } = req.body;
+  const { resultId } = req.body;
 
-  if (!interviewId) {
-    throw new APIError(400, "Interview ID is required");
+  if (!resultId) {
+    throw new APIError(400, "Result ID is required");
   }
 
-  const interview = await Interview.findOne({
-    _id: interviewId,
-    user: userId,
-    status: "in-progress",
-  });
+  // 1. Find the result doc
+  const result = await Result.findOne({
+    _id: resultId,
+    candidate: userId,
+    status: "in-progress"
+  }).populate("interview");
 
-  if (!interview) {
-    throw new APIError(404, "Interview not found or already completed");
+  if (!result) {
+    throw new APIError(404, "Active interview session not found");
   }
 
-  // Ensure all questions have answers
-  const unanswered = interview.questions.filter((q) => !q.answerText);
+  // 2. Ensure all questions are answered
+  const unanswered = result.responses.filter((r) => !r.answer || r.answer.trim() === "");
   if (unanswered.length > 0) {
     throw new APIError(400, "All questions must be answered before submission");
   }
 
-  // Compute average score
-  const totalScore = interview.questions.reduce((sum, q) => sum + (q.score || 0), 0);
-  const avgScore = parseFloat((totalScore / interview.questions.length).toFixed(2));
+  // 3. Update status to completed before AI evaluation
+  result.status = "completed";
+  await result.save();
 
-  // Generate AI summary report
-  const finalReport = await generateFinalReportWithAI(interview.questions);
+  try {
+    // 4. Build prompt for ChatGPT
+    const messages = [
+      {
+        role: "system",
+        content: `You are an expert technical interviewer evaluating coding interview responses.
+Evaluate each answer on:
+1. Technical accuracy (0-10)
+2. Code quality and best practices (0-10)
+3. Problem-solving approach (0-10)
+4. Communication clarity (0-10)
 
-  // Finalize interview
-  interview.status = "completed";
-  interview.score = avgScore;
-  interview.finalReport = finalReport;
-  interview.completedAt = new Date();
-  await interview.save();
+For each question, provide:
+- score (average of above criteria, 0-10)
+- specific feedback
+- suggestions for improvement
 
-  return res.status(200).json(
-    new APIResponse(200, {
-      score: avgScore,
-      finalReport,
-      questions: interview.questions.map((q) => ({
-        questionId: q.questionId,
-        questionText: q.questionText,
-        answerText: q.answerText,
-        score: q.score,
-        aiFeedback: q.aiFeedback,
-      })),
-    }, "Interview submitted and detailed report generated")
-  );
+Return ONLY valid JSON in this exact format:
+{
+  "evaluations": [
+    { 
+      "question": "question text", 
+      "answer": "answer text", 
+      "score": 7.5, 
+      "feedback": "specific feedback",
+      "improvements": ["suggestion1", "suggestion2"]
+    }
+  ],
+  "overallFeedback": "Comprehensive overall feedback",
+  "areasOfImprovement": ["area1", "area2", "area3"],
+  "strengths": ["strength1", "strength2", "strength3"]
+}`
+      },
+      {
+        role: "user",
+        content: `Please evaluate this technical interview:
+
+Interview Topic: ${result.interview.expertise}
+Questions and Answers:
+${JSON.stringify(result.responses.map(r => ({
+  question: r.question,
+  answer: r.answer
+})), null, 2)}`
+      },
+    ];
+
+    // 5. Call ChatGPT
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages,
+      temperature: 0.1,
+      max_tokens: 2000,
+      response_format: { type: "json_object" }
+    });
+
+    let aiResponse;
+    try {
+      aiResponse = JSON.parse(completion.choices[0].message.content);
+    } catch (err) {
+      console.error("AI response parse error:", err);
+      throw new APIError(500, "Failed to parse AI evaluation response");
+    }
+
+    // 6. Update each response with score + feedback
+    result.responses.forEach((response) => {
+      const evaluation = aiResponse.evaluations.find(
+        (e) => e.question === response.question && e.answer === response.answer
+      );
+      
+      if (evaluation) {
+        response.obtainedMarks = Math.min(10, Math.max(0, evaluation.score));
+        response.feedback = evaluation.feedback;
+      }
+    });
+
+    // 7. Save overall feedback
+    result.overallFeedback = aiResponse.overallFeedback || "";
+    result.areasOfImprovement = aiResponse.areasOfImprovement || [];
+    result.strengths = aiResponse.strengths || [];
+    result.status = "evaluated";
+
+    await result.save();
+
+    // 8. Send back final response
+    return res.status(200).json(
+      new APIResponse(
+        200,
+        {
+          resultId: result._id,
+          totalObtained: result.totalObtained,
+          totalMarks: result.totalMarks,
+          percentage: result.percentage,
+          overallFeedback: result.overallFeedback,
+          areasOfImprovement: result.areasOfImprovement,
+          strengths: result.strengths,
+          responses: result.responses.map(r => ({
+            question: r.question,
+            answer: r.answer,
+            score: r.obtainedMarks,
+            feedback: r.feedback
+          }))
+        },
+        "Interview submitted and evaluated successfully"
+      )
+    );
+
+  } catch (error) {
+    console.error("ChatGPT evaluation error:", error);
+    
+    // If ChatGPT fails, still mark as completed but with error note
+    result.status = "completed";
+    result.overallFeedback = "Evaluation pending - system error";
+    await result.save();
+    
+    throw new APIError(500, "AI evaluation failed, but interview was submitted");
+  }
 });
 
-export const getInterviewReport = asyncHandler(async (req, res) => {
-  const { interviewId } = req.params;
-
-  if (!interviewId || !mongoose.Types.ObjectId.isValid(interviewId)) {
-    throw new APIError(400, "Invalid interview ID");
-  }
-
-  const interview = await Interview.findOne({
-    _id: interviewId,
-    user: req.user._id,
-    status: "completed",
-  }).lean();
-
-  if (!interview) {
-    throw new APIError(404, "Completed interview not found");
-  }
-
-  // Return full interview details (safe parts)
-  return res.status(200).json(
-    new APIResponse(200, {
-      interviewId: interview._id,
-      category: interview.category,
-      questions: interview.questions.map((q, index) => ({
-        questionNo: index + 1,
-        questionText: q.questionText,
-        answerText: q.answerText,
-        aiFeedback: q.aiFeedback,
-        score: q.score,
-      })),
-      finalScore: Math.round(
-        interview.questions.reduce((acc, q) => acc + q.score, 0) / interview.questions.length
-      ),
-      finalReport: interview.finalReport,
-      completedAt: interview.updatedAt,
-    }, "Interview Report Fetched Successfully")
-  );
-});
-
-export const deleteInterview = asyncHandler(async (req, res) => {
-  const { interviewId } = req.params;
-
-  if (!interviewId || !mongoose.Types.ObjectId.isValid(interviewId)) {
-    throw new APIError(400, "Invalid interview ID");
-  }
-
-  // Find and delete the interview (only if it belongs to the user)
-  const interview = await Interview.findOneAndDelete({
-    _id: interviewId,
-    user: req.user._id
-  });
-
-  if (!interview) {
-    throw new APIError(404, "Interview not found or not authorized");
-  }
-
-  // Remove from user's interview history
-  await User.findByIdAndUpdate(req.user._id, {
-    $pull: { interviewHistory: { interview: interviewId } }
-  });
-
-  return res.status(200).json(
-    new APIResponse(200, {}, "Interview deleted successfully")
-  );
-});
-
-export const getInterviewById = asyncHandler(async (req, res) => {
-  const { interviewId } = req.params;
-
-  if (!interviewId || !mongoose.Types.ObjectId.isValid(interviewId)) {
-    throw new APIError(400, "Invalid interview ID");
-  }
-
-  const interview = await Interview.findOne({
-    _id: interviewId,
-    user: req.user._id
-  }).lean();
-
-  if (!interview) {
-    throw new APIError(404, "Interview not found");
-  }
-
-  return res.status(200).json(
-    new APIResponse(200, { interview }, "Interview fetched successfully")
-  );
-});
-
-export const getInterviewHistory = asyncHandler(async (req, res) => {
+// Additional utility function
+export const getInterviewResult = asyncHandler(async (req, res) => {
   const userId = req.user._id;
+  const { resultId } = req.params;
 
-  const interviews = await Interview.find({ user: userId })
-    .sort({ createdAt: -1 })
-    .lean();
+  const result = await Result.findOne({
+    _id: resultId,
+    $or: [
+      { candidate: userId },
+      { conductedBy: userId }
+    ]
+  })
+  .populate("candidate", "fullName email avatar")
+  .populate("conductedBy", "fullName email avatar")
+  .populate("interview", "title description expertise");
+
+  if (!result) {
+    throw new APIError(404, "Result not found");
+  }
 
   return res.status(200).json(
-    new APIResponse(200, { interviews }, "Interview history fetched successfully")
-  );
-});
-
-export const pauseInterview = asyncHandler(async (req, res) => {
-  const userId = req.user._id;
-  const { interviewId } = req.body;
-
-  if (!interviewId || !mongoose.Types.ObjectId.isValid(interviewId)) {
-    throw new APIError(400, "Invalid interview ID");
-  }
-
-  const interview = await Interview.findOne({
-    _id: interviewId,
-    user: userId,
-    status: "in-progress"
-  });
-
-  if (!interview) {
-    throw new APIError(404, "Interview not found or not in progress");
-  }
-
-  interview.status = "paused";
-  await interview.save();
-
-  return res.status(200).json(
-    new APIResponse(200, {}, "Interview paused successfully")
-  );
-});
-
-export const resumeInterview = asyncHandler(async (req, res) => {
-  const userId = req.user._id;
-  const { interviewId } = req.body;
-
-  if (!interviewId || !mongoose.Types.ObjectId.isValid(interviewId)) {
-    throw new APIError(400, "Invalid interview ID");
-  }
-
-  const interview = await Interview.findOne({
-    _id: interviewId,
-    user: userId,
-    status: "paused"
-  });
-
-  if (!interview) {
-    throw new APIError(404, "Interview not found or not paused");
-  }
-
-  interview.status = "in-progress";
-  await interview.save();
-
-  return res.status(200).json(
-    new APIResponse(200, {}, "Interview resumed successfully")
+    new APIResponse(
+      200,
+      result,
+      "Interview result retrieved successfully"
+    )
   );
 });

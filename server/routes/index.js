@@ -6,8 +6,8 @@ import { rateLimiter } from "../middleware/rateLimiter.js";
 // Import all route modules
 import authRoutes from "./auth.routes.js";
 import userRoutes from "./user.routes.js";
-import interviewRoutes from "./interview.routes.js";
 import questionRoutes from "./question.routes.js";
+import interviewRoutes from "./interview.routes.js";
 import adminRoutes from "./admin.routes.js";
 import subscriptionRoutes from "./subscription.routes.js";
 

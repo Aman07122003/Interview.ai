@@ -19,17 +19,17 @@ import {
   FiAward,
   FiBook,
   FiCheckCircle,
-  FiBookOpen,
-  FiAward as FiCrown
+  FiBookOpen
 } from 'react-icons/fi';
 import { useSelector } from 'react-redux';
-
+import DashboardInterview from './DashboardInterview';
 
 const Dashboard = () => {
   const [activeTab, setActiveTab] = useState('overview');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const { user } = useSelector((state) => state.user);
-  console.log(user);
+  const user = useSelector((state) => state.auth.user);
+  console.log(user)
+  
   // Mock data for demonstration
   const stats = {
     totalInterviews: 47,
@@ -48,11 +48,11 @@ const Dashboard = () => {
   ];
 
   const navigationItems = [
-    { id: 'overview', label: 'Overview', icon: FiBarChart2, active: activeTab === 'overview' },
-    { id: 'interviews', label: 'Interviews', icon: FiTarget, active: activeTab === 'interviews' },
-    { id: 'progress', label: 'Progress', icon: FiTrendingUp, active: activeTab === 'progress' },
-    { id: 'analytics', label: 'Analytics', icon: FiClipboard, active: activeTab === 'analytics' },
-    { id: 'settings', label: 'Settings', icon: FiSettings, active: activeTab === 'settings' }
+    { id: 'overview', label: 'Overview', icon: FiBarChart2 },
+    { id: 'interviews', label: 'Interviews', icon: FiTarget },
+    { id: 'progress', label: 'Progress', icon: FiTrendingUp },
+    { id: 'analytics', label: 'Analytics', icon: FiClipboard },
+    { id: 'settings', label: 'Settings', icon: FiSettings }
   ];
 
   const StatCard = ({ title, value, change, icon, color }) => {
@@ -61,11 +61,7 @@ const Dashboard = () => {
       <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-6 border border-white/10 hover:border-white/20 transition-all duration-300 hover:shadow-xl group">
         <div className="flex items-center justify-between mb-4">
           <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${color}`}>
-            {typeof icon === 'string' ? (
-              <span className="text-xl">{icon}</span>
-            ) : (
-              <IconComponent className="text-xl text-white" />
-            )}
+            <IconComponent className="text-xl text-white" />
           </div>
           <div className="text-right">
             {change && (
@@ -129,12 +125,13 @@ const Dashboard = () => {
         <nav className="flex-1 p-4 space-y-2">
           {navigationItems.map((item) => {
             const IconComponent = item.icon;
+            const isActive = activeTab === item.id;
             return (
               <button
                 key={item.id}
                 onClick={() => handleNavigation(item.id)}
                 className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-300 ${
-                  activeTab === item.id
+                  isActive
                     ? 'bg-purple-600/20 border border-purple-500/30 text-purple-300'
                     : 'text-gray-400 hover:bg-gray-700/50 hover:text-white'
                 }`}
@@ -150,11 +147,15 @@ const Dashboard = () => {
         <div className="p-4 border-t border-gray-700/50">
           <div className="flex items-center space-x-3">
             <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl flex items-center justify-center">
-              <span className="text-white font-bold">JD</span>
+              {user?.avatar ? (
+                <img src={user.avatar} alt={user.fullName} className="w-8 h-8 rounded-full" />
+              ) : (
+                <FiUser className="text-white text-lg" />
+              )}
             </div>
-            {!sidebarCollapsed && (
+            {!sidebarCollapsed && user && (
               <div className="flex-1">
-                <p className="text-white font-medium text-sm">John Doe</p>
+                <p className="text-white font-medium text-sm">{user.fullName}</p>
                 <p className="text-gray-400 text-xs">Premium Member</p>
               </div>
             )}
@@ -175,8 +176,16 @@ const Dashboard = () => {
                 <FiMenu className="text-xl text-white" />
               </button>
               <div>
-                <h1 className="text-2xl font-bold text-white">Dashboard</h1>
-                <p className="text-gray-400 text-sm">Welcome back! Here's your progress overview.</p>
+                <h1 className="text-2xl font-bold text-white">
+                  {navigationItems.find(item => item.id === activeTab)?.label || 'Dashboard'}
+                </h1>
+                <p className="text-gray-400 text-sm">
+                  {activeTab === 'overview' && "Welcome back! Here's your progress overview."}
+                  {activeTab === 'interviews' && "Manage and review your interview sessions."}
+                  {activeTab === 'progress' && "Track your learning progress and achievements."}
+                  {activeTab === 'analytics' && "Detailed analytics and performance insights."}
+                  {activeTab === 'settings' && "Customize your preferences and settings."}
+                </p>
               </div>
             </div>
             <div className="flex items-center space-x-4">
@@ -192,193 +201,224 @@ const Dashboard = () => {
 
         {/* Dashboard Content */}
         <main className="flex-1 p-8 overflow-auto">
-          <div className="max-w-7xl mx-auto space-y-8">
-            {/* Stats Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
-              <StatCard
-                title="Total Interviews"
-                value={stats.totalInterviews}
-                change={12}
-                icon={FiTarget}
-                color="bg-blue-500/20"
-              />
-              <StatCard
-                title="Success Rate"
-                value={`${stats.successRate}%`}
-                change={5}
-                icon={FiTrendingUp}
-                color="bg-green-500/20"
-              />
-              <StatCard
-                title="Average Score"
-                value={stats.averageScore}
-                change={8}
-                icon={FiStar}
-                color="bg-yellow-500/20"
-              />
-              <StatCard
-                title="Time Spent"
-                value={stats.timeSpent}
-                change={-3}
-                icon={FiClock}
-                color="bg-purple-500/20"
-              />
-              <StatCard
-                title="Questions Answered"
-                value={stats.questionsAnswered}
-                change={18}
-                icon={FiHelpCircle}
-                color="bg-pink-500/20"
-              />
-              <StatCard
-                title="Improvement Rate"
-                value={`${stats.improvementRate}%`}
-                change={22}
-                icon={FiZap}
-                color="bg-indigo-500/20"
-              />
-            </div>
+          {/* Conditional rendering based on activeTab */}
+          {activeTab === 'overview' && (
+            <div className="max-w-7xl mx-auto space-y-8">
+              {/* Stats Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
+                <StatCard
+                  title="Total Interviews"
+                  value={stats.totalInterviews}
+                  change={12}
+                  icon={FiTarget}
+                  color="bg-blue-500/20"
+                />
+                <StatCard
+                  title="Success Rate"
+                  value={`${stats.successRate}%`}
+                  change={5}
+                  icon={FiTrendingUp}
+                  color="bg-green-500/20"
+                />
+                <StatCard
+                  title="Average Score"
+                  value={stats.averageScore}
+                  change={8}
+                  icon={FiStar}
+                  color="bg-yellow-500/20"
+                />
+                <StatCard
+                  title="Time Spent"
+                  value={stats.timeSpent}
+                  change={-3}
+                  icon={FiClock}
+                  color="bg-purple-500/20"
+                />
+                <StatCard
+                  title="Questions Answered"
+                  value={stats.questionsAnswered}
+                  change={18}
+                  icon={FiHelpCircle}
+                  color="bg-pink-500/20"
+                />
+                <StatCard
+                  title="Improvement Rate"
+                  value={`${stats.improvementRate}%`}
+                  change={22}
+                  icon={FiZap}
+                  color="bg-indigo-500/20"
+                />
+              </div>
 
-            {/* Charts and Analytics */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              {/* Performance Chart */}
-              <ChartCard title="Performance Over Time">
-                <div className="h-64 flex items-end justify-between space-x-2">
-                  {[65, 72, 68, 85, 78, 82, 91, 88, 85, 92, 89, 95].map((value, index) => (
-                    <div key={index} className="flex-1 flex flex-col items-center">
-                      <div 
-                        className="w-full bg-gradient-to-t from-purple-600 to-pink-600 rounded-t-lg transition-all duration-300 hover:opacity-80"
-                        style={{ height: `${(value / 100) * 200}px` }}
-                      ></div>
-                      <span className="text-xs text-gray-400 mt-2">{index + 1}</span>
-                    </div>
-                  ))}
-                </div>
-                <div className="mt-4 text-center">
-                  <p className="text-gray-400 text-sm">Last 12 interviews performance</p>
-                </div>
-              </ChartCard>
-
-              {/* Skills Progress */}
-              <ChartCard title="Skills Progress">
-                <div className="space-y-6">
-                  <ProgressBar value={85} max={100} label="JavaScript" color="bg-blue-500" />
-                  <ProgressBar value={72} max={100} label="React" color="bg-cyan-500" />
-                  <ProgressBar value={91} max={100} label="Data Structures" color="bg-green-500" />
-                  <ProgressBar value={68} max={100} label="System Design" color="bg-purple-500" />
-                  <ProgressBar value={78} max={100} label="Algorithms" color="bg-pink-500" />
-                </div>
-              </ChartCard>
-            </div>
-
-            {/* Recent Activity and Quick Actions */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              {/* Recent Interviews */}
-              <div className="lg:col-span-2">
-                <ChartCard title="Recent Interviews">
-                  <div className="space-y-4">
-                    {recentInterviews.map((interview) => (
-                      <div key={interview.id} className="flex items-center justify-between p-4 bg-gray-800/30 rounded-xl border border-gray-700/30 hover:border-gray-600/50 transition-all duration-300">
-                        <div className="flex items-center space-x-4">
-                          <div className={`w-3 h-3 rounded-full ${
-                            interview.score >= 80 ? 'bg-green-500' : 
-                            interview.score >= 70 ? 'bg-yellow-500' : 'bg-red-500'
-                          }`}></div>
-                          <div>
-                            <h4 className="text-white font-medium">{interview.topic}</h4>
-                            <p className="text-gray-400 text-sm">{interview.date}</p>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <div className="text-lg font-bold text-white">{interview.score}%</div>
-                          <div className="text-gray-400 text-sm">Score</div>
-                        </div>
+              {/* Charts and Analytics */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                {/* Performance Chart */}
+                <ChartCard title="Performance Over Time">
+                  <div className="h-64 flex items-end justify-between space-x-2">
+                    {[65, 72, 68, 85, 78, 82, 91, 88, 85, 92, 89, 95].map((value, index) => (
+                      <div key={index} className="flex-1 flex flex-col items-center">
+                        <div 
+                          className="w-full bg-gradient-to-t from-purple-600 to-pink-600 rounded-t-lg transition-all duration-300 hover:opacity-80"
+                          style={{ height: `${(value / 100) * 200}px` }}
+                        ></div>
+                        <span className="text-xs text-gray-400 mt-2">{index + 1}</span>
                       </div>
                     ))}
                   </div>
+                  <div className="mt-4 text-center">
+                    <p className="text-gray-400 text-sm">Last 12 interviews performance</p>
+                  </div>
                 </ChartCard>
-              </div>
 
-              {/* Quick Actions */}
-              <div>
-                <ChartCard title="Quick Actions">
-                  <div className="space-y-4">
-                    <button className="w-full p-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 rounded-xl font-medium transition-all duration-300 text-left">
-                      <div className="flex items-center space-x-3">
-                        <FiPlay className="text-xl text-white" />
-                        <div>
-                          <div className="text-white font-medium">Start New Interview</div>
-                          <div className="text-purple-200 text-sm">Practice with AI</div>
-                        </div>
-                      </div>
-                    </button>
-                    
-                    <button className="w-full p-4 bg-gray-800/50 hover:bg-gray-700/50 rounded-xl font-medium transition-all duration-300 text-left border border-gray-700/30 hover:border-gray-600/50">
-                      <div className="flex items-center space-x-3">
-                        <FiBarChart2 className="text-xl text-white" />
-                        <div>
-                          <div className="text-white font-medium">View Analytics</div>
-                          <div className="text-gray-400 text-sm">Detailed insights</div>
-                        </div>
-                      </div>
-                    </button>
-                    
-                    <button className="w-full p-4 bg-gray-800/50 hover:bg-gray-700/50 rounded-xl font-medium transition-all duration-300 text-left border border-gray-700/30 hover:border-gray-600/50">
-                      <div className="flex items-center space-x-3">
-                        <FiClipboard className="text-xl text-white" />
-                        <div>
-                          <div className="text-white font-medium">Study Materials</div>
-                          <div className="text-gray-400 text-sm">Resources & guides</div>
-                        </div>
-                      </div>
-                    </button>
-                    
-                    <button className="w-full p-4 bg-gray-800/50 hover:bg-gray-700/50 rounded-xl font-medium transition-all duration-300 text-left border border-gray-700/30 hover:border-gray-600/50">
-                      <div className="flex items-center space-x-3">
-                        <FiSettings className="text-xl text-white" />
-                        <div>
-                          <div className="text-white font-medium">Settings</div>
-                          <div className="text-gray-400 text-sm">Preferences</div>
-                        </div>
-                      </div>
-                    </button>
+                {/* Skills Progress */}
+                <ChartCard title="Skills Progress">
+                  <div className="space-y-6">
+                    <ProgressBar value={85} max={100} label="JavaScript" color="bg-blue-500" />
+                    <ProgressBar value={72} max={100} label="React" color="bg-cyan-500" />
+                    <ProgressBar value={91} max={100} label="Data Structures" color="bg-green-500" />
+                    <ProgressBar value={68} max={100} label="System Design" color="bg-purple-500" />
+                    <ProgressBar value={78} max={100} label="Algorithms" color="bg-pink-500" />
                   </div>
                 </ChartCard>
               </div>
-            </div>
 
-            {/* Achievement Badges */}
-            <ChartCard title="Achievements">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {[
-                  { name: 'First Interview', icon: FiTarget, earned: true },
-                  { name: 'Perfect Score', icon: FiStar, earned: true },
-                  { name: 'Consistent Learner', icon: FiBook, earned: true },
-                  { name: 'Speed Demon', icon: FiZap, earned: false },
-                  { name: 'Problem Solver', icon: FiCheckCircle, earned: true },
-                  { name: 'Interview Master', icon: FiAward, earned: false },
-                  { name: 'Quick Learner', icon: FiBookOpen, earned: true },
-                  { name: 'Analytics Expert', icon: FiBarChart2, earned: false }
-                ].map((badge, index) => {
-                  const IconComponent = badge.icon;
-                  return (
-                    <div key={index} className={`p-4 rounded-xl text-center transition-all duration-300 ${
-                      badge.earned 
-                        ? 'bg-gradient-to-br from-purple-600/20 to-pink-600/20 border border-purple-500/30' 
-                        : 'bg-gray-800/30 border border-gray-700/30 opacity-50'
-                    }`}>
-                      <div className="flex justify-center mb-2">
-                        <IconComponent className={`text-2xl ${badge.earned ? 'text-white' : 'text-gray-400'}`} />
-                      </div>
-                      <div className={`text-sm font-medium ${badge.earned ? 'text-white' : 'text-gray-400'}`}>
-                        {badge.name}
-                      </div>
+              {/* Recent Activity and Quick Actions */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                {/* Recent Interviews */}
+                <div className="lg:col-span-2">
+                  <ChartCard title="Recent Interviews">
+                    <div className="space-y-4">
+                      {recentInterviews.map((interview) => (
+                        <div key={interview.id} className="flex items-center justify-between p-4 bg-gray-800/30 rounded-xl border border-gray-700/30 hover:border-gray-600/50 transition-all duration-300">
+                          <div className="flex items-center space-x-4">
+                            <div className={`w-3 h-3 rounded-full ${
+                              interview.score >= 80 ? 'bg-green-500' : 
+                              interview.score >= 70 ? 'bg-yellow-500' : 'bg-red-500'
+                            }`}></div>
+                            <div>
+                              <h4 className="text-white font-medium">{interview.topic}</h4>
+                              <p className="text-gray-400 text-sm">{interview.date}</p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-lg font-bold text-white">{interview.score}%</div>
+                            <div className="text-gray-400 text-sm">Score</div>
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                  );
-                })}
+                  </ChartCard>
+                </div>
+
+                {/* Quick Actions */}
+                <div>
+                  <ChartCard title="Quick Actions">
+                    <div className="space-y-4">
+                      <button className="w-full p-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 rounded-xl font-medium transition-all duration-300 text-left">
+                        <div className="flex items-center space-x-3">
+                          <FiPlay className="text-xl text-white" />
+                          <div>
+                            <div className="text-white font-medium">Start New Interview</div>
+                            <div className="text-purple-200 text-sm">Practice with AI</div>
+                          </div>
+                        </div>
+                      </button>
+                      
+                      <button className="w-full p-4 bg-gray-800/50 hover:bg-gray-700/50 rounded-xl font-medium transition-all duration-300 text-left border border-gray-700/30 hover:border-gray-600/50">
+                        <div className="flex items-center space-x-3">
+                          <FiBarChart2 className="text-xl text-white" />
+                          <div>
+                            <div className="text-white font-medium">View Analytics</div>
+                            <div className="text-gray-400 text-sm">Detailed insights</div>
+                          </div>
+                        </div>
+                      </button>
+                      
+                      <button className="w-full p-4 bg-gray-800/50 hover:bg-gray-700/50 rounded-xl font-medium transition-all duration-300 text-left border border-gray-700/30 hover:border-gray-600/50">
+                        <div className="flex items-center space-x-3">
+                          <FiClipboard className="text-xl text-white" />
+                          <div>
+                            <div className="text-white font-medium">Study Materials</div>
+                            <div className="text-gray-400 text-sm">Resources & guides</div>
+                          </div>
+                        </div>
+                      </button>
+                      
+                      <button className="w-full p-4 bg-gray-800/50 hover:bg-gray-700/50 rounded-xl font-medium transition-all duration-300 text-left border border-gray-700/30 hover:border-gray-600/50">
+                        <div className="flex items-center space-x-3">
+                          <FiSettings className="text-xl text-white" />
+                          <div>
+                            <div className="text-white font-medium">Settings</div>
+                            <div className="text-gray-400 text-sm">Preferences</div>
+                          </div>
+                        </div>
+                      </button>
+                    </div>
+                  </ChartCard>
+                </div>
               </div>
-            </ChartCard>
-          </div>
+
+              {/* Achievement Badges */}
+              <ChartCard title="Achievements">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {[
+                    { name: 'First Interview', icon: FiTarget, earned: true },
+                    { name: 'Perfect Score', icon: FiStar, earned: true },
+                    { name: 'Consistent Learner', icon: FiBook, earned: true },
+                    { name: 'Speed Demon', icon: FiZap, earned: false },
+                    { name: 'Problem Solver', icon: FiCheckCircle, earned: true },
+                    { name: 'Interview Master', icon: FiAward, earned: false },
+                    { name: 'Quick Learner', icon: FiBookOpen, earned: true },
+                    { name: 'Analytics Expert', icon: FiBarChart2, earned: false }
+                  ].map((badge, index) => {
+                    const IconComponent = badge.icon;
+                    return (
+                      <div key={index} className={`p-4 rounded-xl text-center transition-all duration-300 ${
+                        badge.earned 
+                          ? 'bg-gradient-to-br from-purple-600/20 to-pink-600/20 border border-purple-500/30' 
+                          : 'bg-gray-800/30 border border-gray-700/30 opacity-50'
+                      }`}>
+                        <div className="flex justify-center mb-2">
+                          <IconComponent className={`text-2xl ${badge.earned ? 'text-white' : 'text-gray-400'}`} />
+                        </div>
+                        <div className={`text-sm font-medium ${badge.earned ? 'text-white' : 'text-gray-400'}`}>
+                          {badge.name}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </ChartCard>
+            </div>
+          )}
+
+          {/* Other tabs content */}
+          {activeTab === 'interviews' && (
+            <div className="max-w-7xl mx-auto">
+              <DashboardInterview />
+            </div>
+          )}
+
+          {activeTab === 'progress' && (
+            <div className="max-w-7xl mx-auto">
+              <h2 className="text-2xl font-bold text-white mb-6">Progress Tracking</h2>
+              <p className="text-gray-400">Track your learning progress here.</p>
+            </div>
+          )}
+
+          {activeTab === 'analytics' && (
+            <div className="max-w-7xl mx-auto">
+              <h2 className="text-2xl font-bold text-white mb-6">Analytics</h2>
+              <p className="text-gray-400">Detailed analytics will be displayed here.</p>
+            </div>
+          )}
+
+          {activeTab === 'settings' && (
+            <div className="max-w-7xl mx-auto">
+              <h2 className="text-2xl font-bold text-white mb-6">Settings</h2>
+              <p className="text-gray-400">Configure your settings here.</p>
+            </div>
+          )}
         </main>
       </div>
     </div>

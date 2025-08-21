@@ -17,6 +17,12 @@ import PaymentFailure from "./pages/Subscription/PaymentFailure";
 import PaymentSuccess from "./pages/Subscription/PaymentSuccess";
 import RoleRegister from "./pages/RoleRegister";
 import AdminRegister from "./pages/AdminRegister";
+import AdminLogin from "./pages/AdminLogin";
+import AdminDashboard from "./pages/AdminDashboard";
+import CreateInterviewSessions from "./pages/CreateInterviewSessions";
+
+
+
 
 
 function App() {
@@ -51,7 +57,7 @@ function App() {
         <Route path="/" element={<Home />} />
         <Route path="/interview" element={<InterviewLanding />} />
         <Route path="/interview/start" element={<InterviewSession />} />
-        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/user/dashboard" element={<Dashboard />} />
         <Route path="/add-questions" element={<AddQuestions />} />
         <Route path="/admin" element={<Admin />} />
         <Route path="/candidates" element={<CandidatesPage />} />
@@ -63,6 +69,11 @@ function App() {
         <Route path="/subscription/payment-failure" element={<PaymentFailure />} />
         <Route path="/selectRole" element={<RoleRegister/>} />
         <Route path="/admin-register" element={<AdminRegister/>} />
+        <Route path="/admin/login" element={<AdminLogin/>} />
+        <Route path="/admin/Dashboard" element={<AdminDashboard/>} />
+        <Route path="/admin/interview-sessions/create" element={<CreateInterviewSessions/>} />
+       
+
       </Routes>
     </Router>
   )

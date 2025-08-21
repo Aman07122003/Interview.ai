@@ -9,6 +9,7 @@ import {
 import { APIResponse } from "../utils/APIResponse.js";
 import jwt from "jsonwebtoken";
 import mongoose from "mongoose";
+import { User } from "../models/User.js";
 
 // Auth
 const generateAccessAndRefreshToken = async (_id) => {
@@ -338,81 +339,72 @@ const createInterviewSession = asyncHandler(async (req, res) => {
     const {
       title,
       description,
-      candidateName,
-      candidateEmail,
-      position,
-      scheduledDate,
-      duration,
+      participants, // emails from frontend
+      expertise,
+      scheduledAt,
       questions,
-      difficulty,
-      categories
+      status,
     } = req.body;
 
     // Validate required fields
-    if (!title || !candidateName || !candidateEmail || !position) {
-      return res.status(400).json(
-        new APIResponse(400, null, "Title, candidate name, candidate email, and position are required")
-      );
+    if (!title || !expertise || !participants || participants.length === 0) {
+      return res
+        .status(400)
+        .json(new APIResponse(400, null, "Title, expertise, and at least one participant email are required"));
     }
 
     // Validate scheduled date if provided
-    if (scheduledDate && new Date(scheduledDate) < new Date()) {
-      return res.status(400).json(
-        new APIResponse(400, null, "Scheduled date must be in the future")
-      );
+    if (scheduledAt && new Date(scheduledAt) < new Date()) {
+      return res
+        .status(400)
+        .json(new APIResponse(400, null, "Scheduled date must be in the future"));
     }
 
-    // Get the admin who is creating the session
     const adminId = req.admin._id;
+
+    // 🔍 Convert participant emails → user IDs
+    const users = await User.find({ email: { $in: participants } }).select("_id email");
+    if (users.length !== participants.length) {
+      return res
+        .status(400)
+        .json(new APIResponse(400, null, "One or more participant emails are invalid"));
+    }
+
+    const participantIds = users.map((u) => u._id);
 
     // Create the interview session
     const interviewSession = new InterviewSession({
       title,
       description: description || "",
-      candidate: {
-        name: candidateName,
-        email: candidateEmail
-      },
-      position,
-      interviewer: adminId,
-      scheduledDate: scheduledDate || null,
-      duration: duration || 30, // default 30 minutes
-      questions: questions || [],
-      difficulty: difficulty || "medium",
-      categories: categories || [],
-      status: scheduledDate ? "scheduled" : "draft"
+      createdBy: adminId,
+      participants: participantIds,
+      expertise,
+      scheduledAt: scheduledAt || null,
+      questions: (questions || []).map((q) => ({ text: q.text })),
+      status: status || "upcoming",
     });
 
     // Save to database
-    const savedSession = await interviewSession.save();
+    let savedSession = await interviewSession.save();
 
-    // Populate interviewer details
-    await savedSession.populate("interviewer", "username email fullName avatar");
+    // ✅ Populate createdBy and participants (return email instead of IDs)
+    savedSession = await savedSession.populate([
+      { path: "createdBy", select: "username email fullName avatar" },
+      { path: "participants", select: "email fullName" },
+    ]);
 
-    // Add to admin's pastSessions
-    await Admin.findByIdAndUpdate(
-      adminId,
-      {
-        $push: {
-          pastSessions: {
-            interview: savedSession._id,
-            date: new Date()
-          }
-        }
-      }
-    );
-
-    return res.status(201).json(
-      new APIResponse(201, savedSession, "Interview session created successfully")
-    );
-
+    return res
+      .status(201)
+      .json(new APIResponse(201, savedSession, "Interview session created successfully"));
   } catch (error) {
     console.error("Error creating interview session:", error);
-    return res.status(500).json(
-      new APIResponse(500, null, "Internal server error while creating interview session")
-    );
+    return res
+      .status(500)
+      .json(new APIResponse(500, null, "Internal server error while creating interview session"));
   }
 });
+
+
 
 // Get all interview sessions for an admin
 const getAdminInterviewSessions = asyncHandler(async (req, res) => {
@@ -420,8 +412,8 @@ const getAdminInterviewSessions = asyncHandler(async (req, res) => {
     const adminId = req.admin._id;
     const { status, page = 1, limit = 10 } = req.query;
 
-    const filter = { interviewer: adminId };
-    if (status && status !== 'all') {
+    const filter = { createdBy: adminId };
+    if (status && status !== "all") {
       filter.status = status;
     }
 
@@ -433,26 +425,37 @@ const getAdminInterviewSessions = asyncHandler(async (req, res) => {
       .sort({ createdAt: -1 })
       .limit(limitNum)
       .skip(skip)
-      .populate("interviewer", "username fullName avatar");
+      .populate("createdBy", "username fullName avatar email")
+      .populate("participants", "email fullName");
 
     const total = await InterviewSession.countDocuments(filter);
 
     return res.status(200).json(
-      new APIResponse(200, {
-        sessions,
-        totalPages: Math.ceil(total / limitNum),
-        currentPage: pageNum,
-        total
-      }, "Interview sessions retrieved successfully")
+      new APIResponse(
+        200,
+        {
+          sessions,
+          totalPages: Math.ceil(total / limitNum),
+          currentPage: pageNum,
+          total,
+        },
+        "Interview sessions retrieved successfully"
+      )
     );
-
   } catch (error) {
     console.error("Error fetching interview sessions:", error);
-    return res.status(500).json(
-      new APIResponse(500, null, "Internal server error while fetching interview sessions")
-    );
+    return res
+      .status(500)
+      .json(
+        new APIResponse(
+          500,
+          null,
+          "Internal server error while fetching interview sessions"
+        )
+      );
   }
 });
+
 
 // Get single interview session by ID
 const getInterviewSession = asyncHandler(async (req, res) => {
@@ -462,8 +465,10 @@ const getInterviewSession = asyncHandler(async (req, res) => {
 
     const session = await InterviewSession.findOne({
       _id: sessionId,
-      interviewer: adminId
-    }).populate("interviewer", "username fullName avatar expertise");
+      createdBy: adminId // Changed from interviewer to createdBy to match your schema
+    })
+    .populate("createdBy", "username fullName avatar expertise")
+    .populate("participants", "email fullName");
 
     if (!session) {
       return res.status(404).json(

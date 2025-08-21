@@ -4,6 +4,26 @@ import axios from 'axios';
 // Base URL for API calls
 const API_BASE_URL = 'http://localhost:3000/api';
 
+// Create axios instance with interceptors
+const axiosInstance = axios.create({
+  baseURL: API_BASE_URL,
+  withCredentials: true,
+});
+
+// Request interceptor to add auth token
+axiosInstance.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('adminAccessToken');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
 // Async thunk for admin registration
 export const registerAdmin = createAsyncThunk(
   'adminAuth/register',
@@ -50,6 +70,23 @@ export const loginAdmin = createAsyncThunk(
   }
 );
 
+// Async thunk for creating interview session
+export const createInterviewSession = createAsyncThunk(
+  'adminAuth/createInterviewSession',
+  async (sessionData, { rejectWithValue }) => {
+    try {
+      const response = await axiosInstance.post(`${API_BASE_URL}/admin/interview-sessions`, sessionData);
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(
+        error.response?.data?.message || 
+        error.message || 
+        'Failed to create interview session'
+      );
+    }
+  }
+);
+
 // Async thunk for admin logout
 export const logoutAdmin = createAsyncThunk(
   'adminAuth/logout',
@@ -65,6 +102,23 @@ export const logoutAdmin = createAsyncThunk(
         error.response?.data?.message || 
         error.message || 
         'Logout failed. Please try again.'
+      );
+    }
+  }
+);
+
+// Get admin interview sessions
+export const getAdminInterviewSessions = createAsyncThunk(
+  'adminAuth/getInterviewSessions',
+  async (_, { rejectWithValue }) => {
+    try {
+      const response = await axiosInstance.get(`${API_BASE_URL}/admin/interview-sessions`);
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(
+        error.response?.data?.message || 
+        error.message || 
+        'Failed to fetch interview sessions'
       );
     }
   }
@@ -95,10 +149,7 @@ export const getCurrentAdmin = createAsyncThunk(
   'adminAuth/getCurrentAdmin',
   async (_, { rejectWithValue }) => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/admin/profile`, {
-        withCredentials: true,
-      });
-
+      const response = await axiosInstance.get(`${API_BASE_URL}/admin/profile`);
       return response.data;
     } catch (error) {
       return rejectWithValue(
@@ -112,6 +163,7 @@ export const getCurrentAdmin = createAsyncThunk(
 
 const initialState = {
   admin: null,
+  interviewSessions: [],
   accessToken: localStorage.getItem('adminAccessToken') || null,
   refreshToken: localStorage.getItem('adminRefreshToken') || null,
   isAuthenticated: false,
@@ -143,14 +195,19 @@ const adminAuthSlice = createSlice({
     },
     logout: (state) => {
       state.admin = null;
+      state.interviewSessions = [];
       state.accessToken = null;
       state.refreshToken = null;
       state.isAuthenticated = false;
+      state.error = null;
       
       // Remove tokens from localStorage
       localStorage.removeItem('adminAccessToken');
       localStorage.removeItem('adminRefreshToken');
     },
+    clearInterviewSessions: (state) => {
+      state.interviewSessions = [];
+    }
   },
   extraReducers: (builder) => {
     builder
@@ -162,8 +219,6 @@ const adminAuthSlice = createSlice({
       .addCase(registerAdmin.fulfilled, (state, action) => {
         state.isLoading = false;
         state.error = null;
-        // You might want to automatically login after registration
-        // or redirect to login page
       })
       .addCase(registerAdmin.rejected, (state, action) => {
         state.isLoading = false;
@@ -205,6 +260,20 @@ const adminAuthSlice = createSlice({
         localStorage.removeItem('adminRefreshToken');
       })
       
+      // Create Interview Session
+      .addCase(createInterviewSession.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(createInterviewSession.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.interviewSessions = [action.payload.data, ...state.interviewSessions];
+      })
+      .addCase(createInterviewSession.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload;
+      })
+      
       // Logout Admin
       .addCase(logoutAdmin.pending, (state) => {
         state.isLoading = true;
@@ -212,6 +281,7 @@ const adminAuthSlice = createSlice({
       .addCase(logoutAdmin.fulfilled, (state) => {
         state.isLoading = false;
         state.admin = null;
+        state.interviewSessions = [];
         state.accessToken = null;
         state.refreshToken = null;
         state.isAuthenticated = false;
@@ -226,6 +296,7 @@ const adminAuthSlice = createSlice({
         state.error = action.payload;
         // Still logout even if the server call fails
         state.admin = null;
+        state.interviewSessions = [];
         state.accessToken = null;
         state.refreshToken = null;
         state.isAuthenticated = false;
@@ -274,14 +345,28 @@ const adminAuthSlice = createSlice({
         // Clear tokens if getting current admin fails
         localStorage.removeItem('adminAccessToken');
         localStorage.removeItem('adminRefreshToken');
+      })
+      
+      // Get Admin Interview Sessions
+      .addCase(getAdminInterviewSessions.pending, (state) => {
+        state.isLoading = true;
+      })
+      .addCase(getAdminInterviewSessions.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.interviewSessions = action.payload.data.sessions || action.payload.data;
+      })
+      .addCase(getAdminInterviewSessions.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload;
       });
   },
 });
 
-export const { clearError, setCredentials, logout } = adminAuthSlice.actions;
+export const { clearError, setCredentials, logout, clearInterviewSessions } = adminAuthSlice.actions;
 
 // Selectors
 export const selectAdmin = (state) => state.adminAuth.admin;
+export const selectAdminInterviewSessions = (state) => state.adminAuth.interviewSessions;
 export const selectAdminAccessToken = (state) => state.adminAuth.accessToken;
 export const selectAdminIsAuthenticated = (state) => state.adminAuth.isAuthenticated;
 export const selectAdminIsLoading = (state) => state.adminAuth.isLoading;

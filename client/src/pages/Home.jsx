@@ -353,7 +353,7 @@ return (
               Ace your next technical interview with AI-powered feedback, personalized questions, and real progress tracking.
             </p>
             <div className="flex flex-col sm:flex-row gap-6 justify-center items-center">
-              <a href= {isAuthenticated ? "/interview" : "/login"} className="group px-10 py-4 rounded-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 font-bold text-lg shadow-2xl transition-all duration-300 hover:scale-110 hover:shadow-purple-500/50 transform">
+              <a href= {isAuthenticated ? "/user/dashboard" : "/login"} className="group px-10 py-4 rounded-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 font-bold text-lg shadow-2xl transition-all duration-300 hover:scale-110 hover:shadow-purple-500/50 transform">
                 Get Started Free
                 <span className="ml-2 group-hover:translate-x-1 transition-transform duration-300">→</span>
               </a>

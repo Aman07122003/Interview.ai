@@ -23,6 +23,13 @@ const resultSchema = new Schema(
       required: true,
     },
 
+    // Interview status
+    status: {
+      type: String,
+      enum: ["in-progress", "completed", "evaluated"],
+      default: "in-progress"
+    },
+
     // QnA + evaluation
     responses: [
       {
@@ -30,9 +37,13 @@ const resultSchema = new Schema(
           type: String,
           required: true,
         },
+        questionId: {
+          type: Schema.Types.ObjectId,
+          required: true,
+        },
         answer: {
           type: String,
-          required: true,
+          default: "",
         },
         maxMarks: {
           type: Number,
@@ -40,8 +51,16 @@ const resultSchema = new Schema(
         },
         obtainedMarks: {
           type: Number,
-          default: 0, // evaluated by ChatGPT
+          default: 0,
         },
+        feedback: {
+          type: String,
+          default: "",
+        },
+        timeTaken: {
+          type: Number, // in seconds
+          default: 0,
+        }
       },
     ],
 
@@ -52,7 +71,9 @@ const resultSchema = new Schema(
     },
     totalMarks: {
       type: Number,
-      default: 100,
+      default: function() {
+        return this.responses ? this.responses.length * 10 : 0;
+      }
     },
     percentage: {
       type: Number,
@@ -60,26 +81,35 @@ const resultSchema = new Schema(
     },
 
     // ChatGPT feedback
-    feedback: {
+    overallFeedback: {
       type: String,
       default: "",
     },
-    areaOfImprovement: {
-      type: String,
-      default: "",
-    },
+    areasOfImprovement: [{
+      type: String
+    }],
+    strengths: [{
+      type: String
+    }],
   },
   { timestamps: true }
 );
 
-// 🔄 Before save, calculate percentage automatically
+// 🔄 Before save, calculate totals automatically
 resultSchema.pre("save", function (next) {
   if (this.responses && this.responses.length > 0) {
+    // Calculate total marks based on actual questions
+    this.totalMarks = this.responses.length * 10;
+    
     this.totalObtained = this.responses.reduce(
       (sum, r) => sum + (r.obtainedMarks || 0),
       0
     );
-    this.percentage = (this.totalObtained / this.totalMarks) * 100;
+    
+    // Avoid division by zero
+    this.percentage = this.totalMarks > 0 
+      ? (this.totalObtained / this.totalMarks) * 100 
+      : 0;
   }
   next();
 });
