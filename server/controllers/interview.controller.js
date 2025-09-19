@@ -321,7 +321,6 @@ ${JSON.stringify(result.responses.map(r => ({
   }
 });
 
-// Additional utility function
 export const getInterviewResult = asyncHandler(async (req, res) => {
   const userId = req.user._id;
   const { resultId } = req.params;

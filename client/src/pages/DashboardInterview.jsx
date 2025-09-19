@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
-import axiosInstance from "../../utils/axiosInstance";
+import axiosInstanceUser from "../../utils/axiosInstanceUser";
 import { useNavigate } from "react-router-dom";
+import axios from "axios";
 
 const DashboardInterview = () => {
   const [sessions, setSessions] = useState([]);
@@ -11,7 +12,8 @@ const DashboardInterview = () => {
   useEffect(() => {
     const fetchSessions = async () => {
       try {
-        const { data } = await axiosInstance.get("http://localhost:3000/api/admin/interview-sessions");
+        const { data } = await axiosInstanceUser.get("/admin/interview-sessions");
+        console.log(data);
         setSessions(data.data.sessions || []);
       } catch (error) {
         console.error("Error fetching sessions:", error);
@@ -50,13 +52,12 @@ const DashboardInterview = () => {
   }, [sessions]);
 
   // Handle "Start Interview"
-  const handleStartInterview = async () => {
-    try {
-      navigate('/interview');
-    } catch (error) {
-      console.error("Error starting interview:", error);
-    }
+  // when user clicks "Start"
+  const handleStartInterview = (session) => {
+    navigate(`/interview/${session._id}`, { state: { session } });
   };
+  
+  
 
   if (sessions.length === 0) {
     return <p className="text-gray-400">No upcoming interviews</p>;
@@ -67,7 +68,7 @@ const DashboardInterview = () => {
       {sessions.map((session) => (
         <button
           key={session._id}
-          onClick={() => handleStartInterview(session._id)}
+          onClick={() => handleStartInterview(session)}
           className="bg-gray-900 border border-gray-700 rounded-2xl p-5 shadow-lg text-white text-left hover:border-purple-500 transition"
         >
           <h2 className="text-lg font-bold mb-1">{session.title}</h2>

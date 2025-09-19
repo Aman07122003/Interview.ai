@@ -7,6 +7,7 @@ const AddQuestions = () => {
   // Form state
   const [formData, setFormData] = useState({
     category: '',
+    difficulty: '',
     title: '',
     description: '',
     difficulty: '',
@@ -74,6 +75,8 @@ const AddQuestions = () => {
 
     setIsSubmitting(true);
 
+    const response = axiosInstance.post('/questions', formData);
+
     // Simulate API call delay
     setTimeout(() => {
       // Process tags
@@ -95,6 +98,7 @@ const AddQuestions = () => {
       // Reset form
       setFormData({
         category: '',
+        difficulty: '',
         title: '',
         description: '',
         difficulty: '',

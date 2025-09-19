@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   FiBarChart2, 
   FiTarget, 
@@ -6,7 +6,6 @@ import {
   FiClipboard, 
   FiSettings,
   FiBell,
-  FiSearch,
   FiUser,
   FiMenu,
   FiX,
@@ -23,12 +22,31 @@ import {
 } from 'react-icons/fi';
 import { useSelector } from 'react-redux';
 import DashboardInterview from './DashboardInterview';
+import { useNavigate } from 'react-router-dom';
 
 const Dashboard = () => {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('overview');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const user = useSelector((state) => state.auth.user);
-  console.log(user)
+  
+  // Check if device is mobile on component mount and resize
+  useEffect(() => {
+    const checkIfMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    // Initial check
+    checkIfMobile();
+    
+    // Add event listener for window resize
+    window.addEventListener('resize', checkIfMobile);
+    
+    // Cleanup
+    return () => window.removeEventListener('resize', checkIfMobile);
+  }, []);
   
   // Mock data for demonstration
   const stats = {
@@ -101,24 +119,60 @@ const Dashboard = () => {
 
   const handleNavigation = (id) => {
     setActiveTab(id);
+    if (isMobile) {
+      setMobileSidebarOpen(false);
+    }
+  };
+
+  const toggleSidebar = () => {
+    if (isMobile) {
+      setMobileSidebarOpen(!mobileSidebarOpen);
+    } else {
+      setSidebarCollapsed(!sidebarCollapsed);
+    }
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 flex">
+      {/* Mobile Overlay */}
+      {isMobile && mobileSidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/70 backdrop-blur-sm z-10"
+          onClick={() => setMobileSidebarOpen(false)}
+        />
+      )}
+
       {/* Sidebar */}
-      <div className={`${sidebarCollapsed ? 'w-20' : 'w-64'} bg-gray-800/50 backdrop-blur-md border-r border-gray-700/50 transition-all duration-300 flex flex-col`}>
-        {/* Logo */}
-        <div className="p-6 border-b border-gray-700/50">
+      <div className={`
+        ${isMobile 
+          ? `fixed top-0 left-0 h-full z-20 transform transition-transform duration-300 ease-in-out ${
+              mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'
+            }` 
+          : `${sidebarCollapsed ? 'w-20' : 'w-64'}`
+        } 
+        bg-gray-800/90 backdrop-blur-md border-r border-gray-700/50 transition-all duration-300 flex flex-col
+      `}>
+        {/* Logo and Close Button (Mobile) */}
+        <div className="p-6 border-b border-gray-700/50 flex justify-between items-center">
           <div className="flex items-center space-x-3">
             <div className="w-10 h-10 bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl flex items-center justify-center">
               <FiActivity className="text-white text-lg" />
             </div>
-            {!sidebarCollapsed && (
+            {(!sidebarCollapsed && !isMobile) && (
               <span className="text-xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
                 Interview.ai
               </span>
             )}
           </div>
+          
+          {isMobile && (
+            <button
+              onClick={() => setMobileSidebarOpen(false)}
+              className="p-2 rounded-lg hover:bg-gray-700/50 transition-colors"
+            >
+              <FiX className="text-xl text-white" />
+            </button>
+          )}
         </div>
 
         {/* Navigation */}
@@ -137,7 +191,7 @@ const Dashboard = () => {
                 }`}
               >
                 <IconComponent className="text-lg" />
-                {!sidebarCollapsed && <span className="font-medium">{item.label}</span>}
+                {(!sidebarCollapsed || isMobile) && <span className="font-medium">{item.label}</span>}
               </button>
             );
           })}
@@ -153,7 +207,7 @@ const Dashboard = () => {
                 <FiUser className="text-white text-lg" />
               )}
             </div>
-            {!sidebarCollapsed && user && (
+            {(!sidebarCollapsed || isMobile) && user && (
               <div className="flex-1">
                 <p className="text-white font-medium text-sm">{user.fullName}</p>
                 <p className="text-gray-400 text-xs">Premium Member</p>
@@ -164,13 +218,13 @@ const Dashboard = () => {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col">
+      <div className={`flex-1 flex flex-col ${isMobile && mobileSidebarOpen ? 'overflow-hidden' : ''}`}>
         {/* Header */}
         <header className="bg-gray-800/30 backdrop-blur-md border-b border-gray-700/50 p-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
               <button
-                onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+                onClick={toggleSidebar}
                 className="p-2 rounded-lg hover:bg-gray-700/50 transition-colors"
               >
                 <FiMenu className="text-xl text-white" />
@@ -192,7 +246,7 @@ const Dashboard = () => {
               <button className="p-2 rounded-lg hover:bg-gray-700/50 transition-colors">
                 <FiBell className="text-xl text-white" />
               </button>
-              <button className="px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 rounded-xl font-medium transition-all duration-300">
+              <button className="px-4 text-white py-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 rounded-xl font-medium transition-all duration-300">
                 Start Interview
               </button>
             </div>

@@ -4,9 +4,6 @@ import {
   loginAdmin,
   logoutAdmin,
   refreshAccessToken,
-  getCurrentAdmin,
-  updateAdminProfile,
-  changeAdminPassword,
   createInterviewSession,
   getAdminInterviewSessions,
   getInterviewSession,
@@ -42,23 +39,6 @@ router.use(isAdmin); // All routes below this require authentication
 // Auth routes
 router.route("/logout").post(logoutAdmin);
 router.route("/refresh-token").post(refreshAccessToken);
-
-// Profile routes
-router.route("/profile")
-  .get(getCurrentAdmin)
-  .patch(
-    upload.fields([
-      {
-        name: "avatar",
-        maxCount: 1,
-      },
-    ]),
-    updateAdminProfile
-  );
-
-router.route("/change-password").patch(changeAdminPassword);
-
-// Interview Session routes
 router.route("/interview-sessions")
   .post(createInterviewSession)
   .get(getAdminInterviewSessions);

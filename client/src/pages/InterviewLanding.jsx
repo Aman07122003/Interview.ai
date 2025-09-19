@@ -1,11 +1,14 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 
 const InterviewLanding = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const { session } = location.state; // session object from DashboardInterview
 
   const handleStartInterview = () => {
-    navigate('/interview/start');
+    navigate(`/interview/${session._id}/start`);
   };
 
   return (

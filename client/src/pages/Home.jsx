@@ -3,8 +3,9 @@ import { useRef, useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate, Link } from 'react-router-dom';
 import { logout, getCurrentUser } from '../store/slice/authSlice';
-import Gemini_Generated_Image_q63u32q63u32q63u from '../assets/Gemini_Generated_Image_q63u32q63u32q63u.png';
-import axiosInstance from '../../utils/axiosInstance';
+import inter from '../../src/assets/inter.png';
+import { BrainCircuit, BrainCircuitIcon, ChartBarBig, ChartNoAxesCombined, LibraryBig, Mail, Mic, Phone, Rocket, Target } from "lucide-react";
+import axiosInstanceUser from '../../utils/axiosInstanceUser';
 import axios from 'axios';
 
 // LogoutButton component
@@ -70,10 +71,12 @@ const Home = () => {
     fetchPlans();
   }, []);
 
+  console.log(user);
+
   // Payment verification function
   const verifyPayment = async (paymentResponse, subscriptionId) => {
     try {
-      const response = await axiosInstance.post('/api/subscriptions/verify', {
+      const response = await axiosInstanceUser.post('/subscriptions/verify', {
         subscriptionId,
         razorpay_payment_id: paymentResponse.razorpay_payment_id,
         razorpay_order_id: paymentResponse.razorpay_order_id,
@@ -98,11 +101,6 @@ const Home = () => {
     }
   };
 
-  // Handle plan selection and subscription
-  // Handle plan selection and subscription
-// Handle plan selection and subscription
-// Handle plan selection and subscription
-// Handle plan selection and subscription
 const handleSubscribe = async (plan) => {
   console.log("Plan clicked:", plan);
 
@@ -117,7 +115,7 @@ const handleSubscribe = async (plan) => {
     }
 
     // Call backend with correct endpoint and parameter names
-    const response = await axiosInstance.post('/api/subscriptions', {
+    const response = await axiosInstanceUser.post('/subscription', {
       plan: plan.id,
       amount: plan.price,
     });
@@ -390,7 +388,7 @@ return (
                 
                 {/* Video Container */}
                 <div className="relative aspect-video bg-gray-900 rounded-lg overflow-hidden">
-                  <img src={Gemini_Generated_Image_q63u32q63u32q63u} alt="Interview.ai" className="w-full h-full object-cover object-center" />
+                  <img src={inter} alt="Interview.ai" className="w-full h-full object-cover object-center" />
                 </div>
                 
                 {/* Screen Glare Effect */}
@@ -428,22 +426,22 @@ return (
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
             <div className="group bg-gradient-to-br from-gray-800/50 to-gray-900/50 backdrop-blur-sm rounded-2xl p-8 border border-gray-700/50 hover:border-purple-500/50 transition-all duration-300 hover:scale-105 hover:shadow-2xl hover:shadow-purple-500/20">
-              <div className="text-6xl mb-6 group-hover:scale-110 transition-transform duration-300">📚</div>
+              <div className="text-6xl mb-6 group-hover:scale-110 transition-transform duration-300"><LibraryBig /></div>
               <h3 className="font-bold text-xl mb-4 text-white">Question Bank</h3>
               <p className="text-gray-300 leading-relaxed">Practice DSA, OOP, DBMS, and more by topic with curated questions.</p>
             </div>
             <div className="group bg-gradient-to-br from-gray-800/50 to-gray-900/50 backdrop-blur-sm rounded-2xl p-8 border border-gray-700/50 hover:border-purple-500/50 transition-all duration-300 hover:scale-105 hover:shadow-2xl hover:shadow-purple-500/20">
-              <div className="text-6xl mb-6 group-hover:scale-110 transition-transform duration-300">🎤</div>
+              <div className="text-6xl mb-6 group-hover:scale-110 transition-transform duration-300"><Mic /></div>
               <h3 className="font-bold text-xl mb-4 text-white">Voice Input</h3>
               <p className="text-gray-300 leading-relaxed">Answer by typing or speaking naturally with Whisper API integration.</p>
             </div>
             <div className="group bg-gradient-to-br from-gray-800/50 to-gray-900/50 backdrop-blur-sm rounded-2xl p-8 border border-gray-700/50 hover:border-purple-500/50 transition-all duration-300 hover:scale-105 hover:shadow-2xl hover:shadow-purple-500/20">
-              <div className="text-6xl mb-6 group-hover:scale-110 transition-transform duration-300">🤖</div>
+              <div className="text-6xl mb-6 group-hover:scale-110 transition-transform duration-300"><BrainCircuit /></div>
               <h3 className="font-bold text-xl mb-4 text-white">AI Feedback</h3>
               <p className="text-gray-300 leading-relaxed">Get instant, actionable feedback powered by advanced GPT-4 technology.</p>
             </div>
             <div className="group bg-gradient-to-br from-gray-800/50 to-gray-900/50 backdrop-blur-sm rounded-2xl p-8 border border-gray-700/50 hover:border-purple-500/50 transition-all duration-300 hover:scale-105 hover:shadow-2xl hover:shadow-purple-500/20">
-              <div className="text-6xl mb-6 group-hover:scale-110 transition-transform duration-300">📈</div>
+              <div className="text-6xl mb-6 group-hover:scale-110 transition-transform duration-300"><ChartNoAxesCombined /></div>
               <h3 className="font-bold text-xl mb-4 text-white">Progress Dashboard</h3>
               <p className="text-gray-300 leading-relaxed">Track your scores, strengths, and improvement areas with detailed analytics.</p>
             </div>
@@ -530,21 +528,21 @@ return (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <div className="group bg-gradient-to-br from-gray-800/50 to-gray-900/50 backdrop-blur-sm rounded-2xl p-8 border border-gray-700/50 hover:border-purple-500/50 transition-all duration-300 hover:scale-105 hover:shadow-2xl hover:shadow-purple-500/20">
               <div className="w-16 h-16 bg-gradient-to-r from-purple-600 to-pink-600 rounded-full flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
-                <span className="text-2xl">🚀</span>
+              <Rocket />
               </div>
               <h3 className="font-bold text-xl mb-4 text-white">Boost Your Confidence</h3>
               <p className="text-gray-300 leading-relaxed">Practice real interview questions and get instant, unbiased feedback to build your confidence.</p>
             </div>
             <div className="group bg-gradient-to-br from-gray-800/50 to-gray-900/50 backdrop-blur-sm rounded-2xl p-8 border border-gray-700/50 hover:border-purple-500/50 transition-all duration-300 hover:scale-105 hover:shadow-2xl hover:shadow-purple-500/20">
               <div className="w-16 h-16 bg-gradient-to-r from-purple-600 to-pink-600 rounded-full flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
-                <span className="text-2xl">🎯</span>
+              <Target />
               </div>
               <h3 className="font-bold text-xl mb-4 text-white">Personalized Learning</h3>
               <p className="text-gray-300 leading-relaxed">Identify your strengths and focus on areas that need improvement with AI-driven insights.</p>
             </div>
             <div className="group bg-gradient-to-br from-gray-800/50 to-gray-900/50 backdrop-blur-sm rounded-2xl p-8 border border-gray-700/50 hover:border-purple-500/50 transition-all duration-300 hover:scale-105 hover:shadow-2xl hover:shadow-purple-500/20">
               <div className="w-16 h-16 bg-gradient-to-r from-purple-600 to-pink-600 rounded-full flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
-                <span className="text-2xl">📊</span>
+              <ChartBarBig />
               </div>
               <h3 className="font-bold text-xl mb-4 text-white">Track Your Progress</h3>
               <p className="text-gray-300 leading-relaxed">Visualize your journey and celebrate your growth over time with detailed progress tracking.</p>
@@ -564,12 +562,12 @@ return (
           </p>
           <div className="flex flex-col md:flex-row gap-8 justify-center items-center">
             <a href="mailto:support@interview.ai" className="group flex items-center space-x-3 text-purple-400 hover:text-purple-300 transition-all duration-300 hover:scale-105">
-              <span className="text-2xl">📧</span>
-              <span className="text-lg font-semibold">support@interview.ai</span>
+              <Mail />
+              <span className="text-lg font-semibold">samanpratap219@gmail.com</span>
             </a>
             <a href="tel:+1234567890" className="group flex items-center space-x-3 text-purple-400 hover:text-purple-300 transition-all duration-300 hover:scale-105">
-              <span className="text-2xl">📞</span>
-              <span className="text-lg font-semibold">+1 (234) 567-890</span>
+              <Phone />
+              <span className="text-lg font-semibold">+91-9351873908</span>
             </a>
           </div>
         </div>

@@ -1,11 +1,5 @@
 import mongoose from "mongoose";
 
-/**
- * Interview Schema - AI-evaluated technical interview sessions
- * 
- * This model represents a complete interview session where a user answers
- * multiple questions and receives AI-generated feedback and scoring.
- */
 const InterviewSchema = new mongoose.Schema({
   // Reference to the user who took the interview
   user: {

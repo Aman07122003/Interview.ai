@@ -63,7 +63,7 @@ const Login = () => {
     try {
       setIsLoading(true);
       await dispatch(login(formData)).unwrap();
-      navigate('/dashboard');
+      navigate('/user/dashboard');
     } catch (error) {
       console.error('Login error:', error);
       setErrors({ submit: error.message || 'Login failed. Please check your credentials.' });

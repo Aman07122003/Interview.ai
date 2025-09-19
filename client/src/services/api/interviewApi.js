@@ -1,42 +1,54 @@
 // services/api/interviewApi.js
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000/api';
+import axiosInstanceUser from "../../../utils/axiosInstanceUser.js";
 
 export const interviewApi = {
-  // Start interview session
+  // ✅ Start interview session - FIXED ENDPOINT
   startInterview: async (sessionId) => {
-    const response = await fetch(`${API_BASE_URL}/interviews/start/${sessionId}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
-      }
-    });
-    return response.json();
+    try {
+      const res = await axiosInstanceUser.post(`/api/interviews/start/${sessionId}`);
+      console.log("Interview started:", res.data);
+      return res.data;
+    } catch (err) {
+      console.error("Error starting interview:", err.response?.data || err.message);
+      throw err;
+    }
   },
 
-  // Save answer
+  // ✅ Save answer - FIXED ENDPOINT
   saveAnswer: async (resultId, questionId, answer, timeTaken) => {
-    const response = await fetch(`${API_BASE_URL}/interviews/answer`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
-      },
-      body: JSON.stringify({ resultId, questionId, answerText: answer, timeTaken })
-    });
-    return response.json();
+    try {
+      const res = await axiosInstanceUser.post(`/api/interviews/answer`, {
+        resultId,
+        questionId,
+        answerText: answer,
+        timeTaken,
+      });
+      return res.data;
+    } catch (err) {
+      console.error("Error saving answer:", err.response?.data || err.message);
+      throw err;
+    }
   },
 
-  // Finalize interview
+  // ✅ Finalize interview - FIXED ENDPOINT
   finalizeInterview: async (resultId) => {
-    const response = await fetch(`${API_BASE_URL}/interviews/submit`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
-      },
-      body: JSON.stringify({ resultId })
-    });
-    return response.json();
+    try {
+      const res = await axiosInstanceUser.post(`/api/interviews/submit`, { resultId });
+      return res.data;
+    } catch (err) {
+      console.error("Error finalizing interview:", err.response?.data || err.message);
+      throw err;
+    }
+  },
+
+  // ✅ Get interview result - ADDED THIS
+  getResult: async (resultId) => {
+    try {
+      const res = await axiosInstanceUser.get(`/api/interviews/result/${resultId}`);
+      return res.data;
+    } catch (err) {
+      console.error("Error getting result:", err.response?.data || err.message);
+      throw err;
+    }
   }
 };

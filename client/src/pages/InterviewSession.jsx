@@ -1,198 +1,466 @@
-import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { useSelector, useDispatch } from 'react-redux';
-import { startInterviewSession } from '../store/slice/interviewSlice';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useSelector } from 'react-redux';
 
-const InterviewStart = () => {
-  const { sessionId } = useParams();
+const Interview = () => {
   const navigate = useNavigate();
-  const dispatch = useDispatch();
   const { user } = useSelector((state) => state.auth);
-  const { currentSession, loading, error } = useSelector((state) => state.interview);
   
-  const [interviewData, setInterviewData] = useState(null);
-  const [isStarting, setIsStarting] = useState(false);
+  // Dummy interview session data
+  const dummyInterviewSession = {
+    _id: 'dummy-session-id',
+    title: 'Technical Interview - Frontend Development',
+    description: 'This interview will test your knowledge of frontend development concepts, JavaScript, and React.',
+    expertise: 'Frontend Development',
+    createdBy: {
+      fullName: 'Interview Admin',
+      avatar: 'https://example.com/avatar.jpg'
+    },
+    questions: [
+      {
+        _id: 'q1',
+        text: 'Explain the difference between let, const, and var in JavaScript. When would you use each?'
+      },
+      {
+        _id: 'q2', 
+        text: 'What are React hooks? Explain useState and useEffect with examples.'
+      },
+      {
+        _id: 'q3',
+        text: 'How would you optimize the performance of a React application?'
+      },
+      {
+        _id: 'q4',
+        text: 'Explain the concept of closures in JavaScript with a practical example.'
+      },
+      {
+        _id: 'q5',
+        text: 'What is the virtual DOM in React and how does it improve performance?'
+      }
+    ]
+  };
 
-  // Load interview session details
+  // State management
+  const [interviewSession, setInterviewSession] = useState(dummyInterviewSession);
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [userAnswer, setUserAnswer] = useState('');
+  const [isRecording, setIsRecording] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [showFeedback, setShowFeedback] = useState(false);
+  const [aiFeedback, setAiFeedback] = useState(null);
+  const [timeRemaining, setTimeRemaining] = useState(30 * 60);
+  const [isPaused, setIsPaused] = useState(false);
+  const [interviewStarted, setInterviewStarted] = useState(false);
+  const [resultId, setResultId] = useState('dummy-result-id');
+  const [timeStarted, setTimeStarted] = useState(null);
+
+  // Refs
+  const textareaRef = useRef(null);
+  const timerRef = useRef(null);
+
+  // Timer effect
   useEffect(() => {
-    const fetchInterviewSession = async () => {
-      try {
-        const response = await fetch(`/api/interview-sessions/${sessionId}`, {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
+    if (interviewStarted && !isPaused && timeRemaining > 0) {
+      timerRef.current = setInterval(() => {
+        setTimeRemaining(prev => {
+          if (prev <= 1) {
+            clearInterval(timerRef.current);
+            handleEndInterview();
+            return 0;
           }
+          return prev - 1;
         });
-        
-        if (response.ok) {
-          const data = await response.json();
-          setInterviewData(data.data);
-        } else {
-          console.error('Failed to fetch interview session');
-        }
-      } catch (error) {
-        console.error('Error fetching interview session:', error);
+      }, 1000);
+    }
+
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
       }
     };
+  }, [interviewStarted, isPaused, timeRemaining]);
 
-    if (sessionId) {
-      fetchInterviewSession();
-    }
-  }, [sessionId]);
+  // Format time
+  const formatTime = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
 
-  // Handle starting the interview
-  const handleStartInterview = async () => {
-    setIsStarting(true);
+  // Calculate time taken for current question
+  const getTimeTaken = () => {
+    if (!timeStarted) return 0;
+    return Math.floor((Date.now() - timeStarted) / 1000);
+  };
+
+  // Handle answer submission
+  const handleSubmitAnswer = async () => {
+    if (!userAnswer.trim()) return;
+
+    setIsLoading(true);
+
     try {
-      const result = await dispatch(startInterviewSession(sessionId)).unwrap();
+      // Simulate API delay
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
-      if (result) {
-        // Navigate to the interview questions page
-        navigate(`/interview/${sessionId}/question/0`, { 
-          state: { 
-            interviewSession: interviewData,
-            resultId: result._id 
-          } 
-        });
-      }
+      const feedback = generateAIFeedback(userAnswer, interviewSession.questions[currentQuestionIndex].text);
+      setAiFeedback(feedback);
+      setShowFeedback(true);
     } catch (error) {
-      console.error('Failed to start interview:', error);
+      console.error('Error submitting answer:', error);
     } finally {
-      setIsStarting(false);
+      setIsLoading(false);
     }
   };
 
-  if (!interviewData) {
+  // Generate AI feedback (simulated)
+  const generateAIFeedback = (answer, question) => {
+    const feedbacks = [
+      {
+        score: Math.floor(Math.random() * 30) + 70,
+        feedback: "Excellent answer! You demonstrated a strong understanding of the concept.",
+        improvements: ["Consider adding more real-world examples", "You could mention edge cases"],
+        modelAnswer: "A comprehensive answer should include practical examples and edge cases. For example, when discussing variable declarations, you could mention hoisting behavior and temporal dead zone concepts."
+      },
+      {
+        score: Math.floor(Math.random() * 30) + 60,
+        feedback: "Good response with solid fundamentals. You covered the main points well.",
+        improvements: ["Provide more specific examples", "Explain the reasoning behind your approach"],
+        modelAnswer: "The key is to not only explain what something is, but why it matters. For instance, when discussing React hooks, explain the problems they solve compared to class components."
+      },
+      {
+        score: Math.floor(Math.random() * 30) + 80,
+        feedback: "Outstanding answer! You provided comprehensive explanations with excellent examples.",
+        improvements: ["Consider discussing alternative approaches", "You could mention browser compatibility considerations"],
+        modelAnswer: "This is an excellent response. To make it even better, you could discuss how different JavaScript engines implement these features and any potential performance implications."
+      }
+    ];
+    
+    return feedbacks[Math.floor(Math.random() * feedbacks.length)];
+  };
+
+  // Handle next question
+  const handleNextQuestion = () => {
+    if (currentQuestionIndex < interviewSession.questions.length - 1) {
+      setCurrentQuestionIndex(prev => prev + 1);
+      setUserAnswer('');
+      setShowFeedback(false);
+      setAiFeedback(null);
+      setTimeStarted(Date.now());
+    } else {
+      handleEndInterview();
+    }
+  };
+
+  // Handle interview start
+  const handleStartInterview = async () => {
+    try {
+      setIsLoading(true);
+      // Simulate API delay
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      setInterviewStarted(true);
+      setTimeStarted(Date.now());
+      setTimeRemaining(30 * 60);
+    } catch (error) {
+      console.error('Error starting interview:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Handle interview end
+  const handleEndInterview = async () => {
+    try {
+      setIsLoading(true);
+      // Simulate API delay
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      navigate('/interview/results/dummy-result-id');
+    } catch (error) {
+      console.error('Error ending interview:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  if (!interviewSession) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 flex items-center justify-center">
-        <div className="text-white text-xl">Loading interview session...</div>
+        <div className="text-white text-xl">
+          {isLoading ? 'Loading interview session...' : 'Interview session not found'}
+        </div>
       </div>
     );
   }
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 flex items-center justify-center p-6">
-      <div className="max-w-2xl w-full bg-gray-800/30 backdrop-blur-md rounded-3xl p-8 border border-gray-700/30 shadow-2xl">
-        <div className="text-center">
-          {/* Header */}
-          <div className="w-24 h-24 bg-gradient-to-r from-purple-600 to-pink-600 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-lg">
-            <span className="text-4xl">📋</span>
-          </div>
-          
-          <h1 className="text-4xl font-black mb-4 bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-            {interviewData.title}
-          </h1>
-          
-          <p className="text-gray-300 text-lg mb-8 leading-relaxed">
-            {interviewData.description || 'Technical interview session'}
-          </p>
-
-          {/* Session Details */}
-          <div className="bg-gray-800/50 rounded-2xl p-6 mb-8 border border-gray-700/30">
-            <h2 className="text-xl font-bold text-white mb-4">Session Details</h2>
+  if (!interviewStarted) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 flex items-center justify-center p-4">
+        <div className="max-w-lg w-full bg-gray-800/30 backdrop-blur-md rounded-3xl p-12 border border-gray-700/30 shadow-2xl">
+          <div className="text-center">
+            <div className="w-20 h-20 bg-gradient-to-r from-purple-600 to-pink-600 rounded-2xl flex items-center justify-center mx-auto mb-8 shadow-lg">
+              <span className="text-3xl">🤖</span>
+            </div>
+            <h1 className="text-4xl font-black mb-4 bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
+              {interviewSession.title}
+            </h1>
+            <p className="text-gray-300 text-lg mb-8 leading-relaxed">
+              {interviewSession.description}
+            </p>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-purple-600/20 rounded-xl flex items-center justify-center">
-                  <span className="text-purple-400">👤</span>
-                </div>
-                <div>
-                  <p className="text-gray-400 text-sm">Interviewer</p>
-                  <p className="text-white font-medium">
-                    {interviewData.createdBy?.fullName || 'Admin'}
-                  </p>
-                </div>
+            <div className="space-y-4 mb-8 text-left">
+              <div className="flex items-center space-x-3 text-gray-400">
+                <span className="w-2 h-2 bg-purple-500 rounded-full"></span>
+                <span><strong>Expertise:</strong> {interviewSession.expertise}</span>
               </div>
-
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-blue-600/20 rounded-xl flex items-center justify-center">
-                  <span className="text-blue-400">📊</span>
-                </div>
-                <div>
-                  <p className="text-gray-400 text-sm">Expertise</p>
-                  <p className="text-white font-medium">{interviewData.expertise}</p>
-                </div>
+              <div className="flex items-center space-x-3 text-gray-400">
+                <span className="w-2 h-2 bg-purple-500 rounded-full"></span>
+                <span><strong>Questions:</strong> {interviewSession.questions.length}</span>
               </div>
-
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-green-600/20 rounded-xl flex items-center justify-center">
-                  <span className="text-green-400">❓</span>
-                </div>
-                <div>
-                  <p className="text-gray-400 text-sm">Questions</p>
-                  <p className="text-white font-medium">
-                    {interviewData.questions?.length || 0} questions
-                  </p>
-                </div>
+              <div className="flex items-center space-x-3 text-gray-400">
+                <span className="w-2 h-2 bg-purple-500 rounded-full"></span>
+                <span><strong>Time Limit:</strong> 30 minutes</span>
               </div>
-
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-yellow-600/20 rounded-xl flex items-center justify-center">
-                  <span className="text-yellow-400">⏱️</span>
-                </div>
-                <div>
-                  <p className="text-gray-400 text-sm">Estimated Time</p>
-                  <p className="text-white font-medium">
-                    {Math.round((interviewData.questions?.length || 0) * 3)} minutes
-                  </p>
-                </div>
+              <div className="flex items-center space-x-3 text-gray-400">
+                <span className="w-2 h-2 bg-purple-500 rounded-full"></span>
+                <span><strong>Interviewer:</strong> {interviewSession.createdBy.fullName}</span>
               </div>
             </div>
+            
+            <button
+              onClick={handleStartInterview}
+              disabled={isLoading}
+              className="w-full py-5 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 rounded-2xl font-bold text-xl transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed shadow-2xl hover:shadow-purple-500/25"
+            >
+              {isLoading ? 'Starting...' : 'Start Interview Now'}
+            </button>
           </div>
+        </div>
+      </div>
+    );
+  }
 
-          {/* Instructions */}
-          <div className="bg-gray-800/50 rounded-2xl p-6 mb-8 border border-gray-700/30">
-            <h2 className="text-xl font-bold text-white mb-4">Instructions</h2>
-            <ul className="text-left space-y-3 text-gray-300">
-              <li className="flex items-start space-x-3">
-                <span className="text-green-400 mt-1">•</span>
-                <span>Answer all questions to the best of your ability</span>
-              </li>
-              <li className="flex items-start space-x-3">
-                <span className="text-green-400 mt-1">•</span>
-                <span>You cannot go back to previous questions once answered</span>
-              </li>
-              <li className="flex items-start space-x-3">
-                <span className="text-green-400 mt-1">•</span>
-                <span>Your answers will be evaluated by our AI system</span>
-              </li>
-              <li className="flex items-start space-x-3">
-                <span className="text-green-400 mt-1">•</span>
-                <span>Take your time - quality matters more than speed</span>
-              </li>
-            </ul>
-          </div>
+  const currentQuestion = interviewSession.questions[currentQuestionIndex];
 
-          {/* Error Message */}
-          {error && (
-            <div className="bg-red-600/20 border border-red-500/30 rounded-2xl p-4 mb-6">
-              <p className="text-red-300">{error}</p>
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900">
+      {/* Header */}
+      <header className="bg-gray-800/30 backdrop-blur-md border-b border-gray-700/30 p-6 shadow-lg">
+        <div className="max-w-7xl mx-auto flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <div className="w-10 h-10 bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl flex items-center justify-center">
+              <span className="text-lg">🤖</span>
             </div>
-          )}
+            <div>
+              <h1 className="text-xl font-bold text-white">{interviewSession.title}</h1>
+              <p className="text-gray-400 text-sm">{interviewSession.expertise}</p>
+            </div>
+          </div>
+          <div className="flex items-center space-x-3">
+            <button
+              onClick={() => setIsPaused(!isPaused)}
+              className="px-4 py-2.5 rounded-xl border border-gray-600 hover:border-purple-500 transition-all duration-300 hover:bg-gray-700/50"
+              title={isPaused ? "Resume Timer" : "Pause Timer"}
+              disabled={isLoading}
+            >
+              <span className="text-lg">{isPaused ? "▶️" : "⏸️"}</span>
+            </button>
+            <button
+              onClick={handleEndInterview}
+              className="px-6 py-2.5 bg-red-600/20 hover:bg-red-600/30 border border-red-500/30 hover:border-red-500/50 rounded-xl transition-all duration-300 text-red-300 hover:text-red-200"
+              disabled={isLoading}
+            >
+              {isLoading ? 'Submitting...' : 'End Interview'}
+            </button>
+          </div>
+        </div>
+      </header>
 
-          {/* Start Button */}
-          <button
-            onClick={handleStartInterview}
-            disabled={isStarting || loading}
-            className="w-full py-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 rounded-2xl font-bold text-xl transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed shadow-2xl hover:shadow-purple-500/25"
-          >
-            {isStarting || loading ? (
-              <div className="flex items-center justify-center space-x-3">
-                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                <span>Starting Interview...</span>
+      <div className="flex flex-col lg:flex-row">
+        {/* Left Panel - Question and Answer */}
+        <div className="flex-1 lg:w-2/3 p-8 overflow-hidden">
+          <div className="h-full flex flex-col space-y-8">
+            {/* Question Display */}
+            <div className="bg-gray-800/30 backdrop-blur-md rounded-3xl p-8 border border-gray-700/30 shadow-xl">
+              <div className="flex items-center justify-between mb-6">
+                <span className="px-4 py-2 bg-purple-600/20 text-purple-300 rounded-xl text-sm font-medium border border-purple-500/30">
+                  Question {currentQuestionIndex + 1}
+                </span>
+                <div className="text-right">
+                  <span className="text-gray-400 text-sm font-medium">Progress</span>
+                  <div className="text-2xl font-bold text-purple-400">
+                    {currentQuestionIndex + 1} <span className="text-gray-400 text-lg">/ {interviewSession.questions.length}</span>
+                  </div>
+                </div>
               </div>
-            ) : (
-              'Start Interview Now'
+              <h2 className="text-2xl font-bold text-white leading-relaxed">
+                {currentQuestion.text}
+              </h2>
+            </div>
+
+            {/* Answer Input */}
+            {!showFeedback && (
+              <div className="flex-1 flex flex-col">
+                <div className="bg-gray-800/30 backdrop-blur-md rounded-3xl p-8 border border-gray-700/30 shadow-xl flex-1 flex flex-col">
+                  <div className="flex items-center justify-between mb-6">
+                    <h3 className="text-xl font-bold text-white">Your Answer</h3>
+                    <div className="flex items-center space-x-4">
+                      <button
+                        onClick={() => setIsRecording(!isRecording)}
+                        className={`p-4 rounded-2xl transition-all duration-300 ${
+                          isRecording 
+                            ? 'bg-red-600/20 border-red-500/50 animate-pulse' 
+                            : 'bg-gray-700/50 hover:bg-gray-600/50 border-gray-600/50 hover:border-gray-500/50'
+                        } border`}
+                        disabled={isLoading}
+                      >
+                        <span className="text-xl">🎤</span>
+                      </button>
+                      <button
+                        onClick={handleSubmitAnswer}
+                        disabled={!userAnswer.trim() || isLoading}
+                        className="px-8 py-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 rounded-2xl font-bold transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {isLoading ? 'Submitting...' : 'Submit Answer'}
+                      </button>
+                    </div>
+                  </div>
+                  <textarea
+                    ref={textareaRef}
+                    value={userAnswer}
+                    onChange={(e) => setUserAnswer(e.target.value)}
+                    placeholder="Type your answer here..."
+                    className="flex-1 bg-gray-900/50 border border-gray-600/50 rounded-2xl p-6 text-white placeholder-gray-400 resize-none focus:outline-none focus:border-purple-500/50 transition-all duration-300 text-lg"
+                    disabled={isLoading}
+                    rows={8}
+                  />
+                </div>
+              </div>
             )}
-          </button>
 
-          {/* Additional Info */}
-          <p className="text-gray-400 text-sm mt-6">
-            By starting this interview, you agree to our terms of service and privacy policy
-          </p>
+            {/* AI Feedback */}
+            {showFeedback && aiFeedback && (
+              <div className="flex-1 flex flex-col space-y-8">
+                <div className="bg-gray-800/30 backdrop-blur-md rounded-3xl p-8 border border-gray-700/30 shadow-xl">
+                  <div className="flex items-center space-x-4 mb-6">
+                    <div className="w-12 h-12 bg-gradient-to-r from-purple-600 to-pink-600 rounded-2xl flex items-center justify-center">
+                      <span className="text-xl">🤖</span>
+                    </div>
+                    <h3 className="text-xl font-bold text-white">AI Feedback</h3>
+                  </div>
+                  
+                  <div className="mb-8">
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-gray-300 font-medium">Score</span>
+                      <span className="text-3xl font-black text-purple-400">{aiFeedback.score}%</span>
+                    </div>
+                    <div className="w-full bg-gray-700/50 rounded-2xl h-3 overflow-hidden">
+                      <div 
+                        className="bg-gradient-to-r from-purple-500 to-pink-500 h-3 rounded-2xl transition-all duration-1000"
+                        style={{ width: `${aiFeedback.score}%` }}
+                      ></div>
+                    </div>
+                  </div>
+
+                  <p className="text-gray-200 text-lg mb-8">{aiFeedback.feedback}</p>
+
+                  <div className="mb-8">
+                    <h4 className="font-bold text-white text-lg mb-4">Areas for Improvement:</h4>
+                    <ul className="space-y-3">
+                      {aiFeedback.improvements.map((improvement, index) => (
+                        <li key={index} className="text-gray-300">
+                          • {improvement}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  <div>
+                    <h4 className="font-bold text-white text-lg mb-4">Model Answer:</h4>
+                    <p className="text-gray-200 bg-gray-900/50 p-6 rounded-2xl border border-gray-700/50">
+                      {aiFeedback.modelAnswer}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex justify-between">
+                  <button
+                    onClick={() => {
+                      setShowFeedback(false);
+                      setAiFeedback(null);
+                    }}
+                    className="px-8 py-4 border border-gray-600/50 hover:border-purple-500/50 rounded-2xl transition-all duration-300"
+                    disabled={isLoading}
+                  >
+                    Edit Answer
+                  </button>
+                  <button
+                    onClick={handleNextQuestion}
+                    className="px-8 py-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 rounded-2xl font-bold transition-all duration-300"
+                    disabled={isLoading}
+                  >
+                    {currentQuestionIndex < interviewSession.questions.length - 1 ? "Next Question" : "Finish Interview"}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Right Panel - Timer and Progress */}
+        <div className="lg:w-1/3 p-8 bg-gray-800/20 backdrop-blur-md border-l border-gray-700/30">
+          <div className="space-y-8">
+            <div className="bg-gray-800/30 backdrop-blur-md rounded-3xl p-8 border border-gray-700/30 shadow-xl">
+              <h3 className="text-xl font-bold text-white mb-6">Session Timer</h3>
+              <div className="text-center">
+                <div className="text-5xl font-black text-purple-400 mb-3 font-mono">
+                  {formatTime(timeRemaining)}
+                </div>
+                <div className="text-gray-400">
+                  {isPaused ? "Paused" : "Time Remaining"}
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-gray-800/30 backdrop-blur-md rounded-3xl p-8 border border-gray-700/30 shadow-xl">
+              <h3 className="text-xl font-bold text-white mb-6">Progress</h3>
+              <div className="mb-6">
+                <div className="flex justify-between text-sm mb-3">
+                  <span className="text-gray-300">Questions Completed</span>
+                  <span className="text-purple-400 font-bold">{currentQuestionIndex + 1}/{interviewSession.questions.length}</span>
+                </div>
+                <div className="w-full bg-gray-700/50 rounded-2xl h-3 overflow-hidden">
+                  <div 
+                    className="bg-gradient-to-r from-purple-500 to-pink-500 h-3 rounded-2xl transition-all duration-500"
+                    style={{ width: `${((currentQuestionIndex + 1) / interviewSession.questions.length) * 100}%` }}
+                  ></div>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-gray-800/30 backdrop-blur-md rounded-3xl p-8 border border-gray-700/30 shadow-xl">
+              <h3 className="text-xl font-bold text-white mb-6">Candidate Info</h3>
+              <div className="space-y-3">
+                <div className="flex justify-between">
+                  <span className="text-gray-300">Name:</span>
+                  <span className="text-white">{user?.fullName || 'Test Candidate'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-300">Email:</span>
+                  <span className="text-white">{user?.email || 'test@example.com'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-300">Status:</span>
+                  <span className="text-green-400">In Progress</span>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
   );
 };
 
-export default InterviewStart;
+export default Interview;

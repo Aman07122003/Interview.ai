@@ -2,6 +2,7 @@ import React from 'react'
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit'
 import api, { tokenManager } from '../../services/api/config';
 import * as authApi from '../../services/api/auth';
+import axios from 'axios';
 
 
 // Define initial state
@@ -41,6 +42,24 @@ const initialState = {
             return rejectWithValue(error.response.data);
         }
     });
+
+
+    export const refreshToken = createAsyncThunk(
+        'auth/refreshToken',
+        async (_, { getState, rejectWithValue }) => {
+          try {
+            const refreshToken = getState().auth.refreshToken;
+      
+            const response = await api.post('/auth/refresh-token', { refreshToken }); // ✅ send token
+            return response.data; // should contain new accessToken + maybe refreshToken
+          } catch (error) {
+            return rejectWithValue(error.response?.data || error.message);
+          }
+        }
+      );
+      
+
+      
 
     export const getCurrentUser = createAsyncThunk('/auth/getCurrentUser', async (_, { rejectWithValue }) => {
         try {
@@ -105,6 +124,27 @@ const initialState = {
                 state.status = false;
                 state.error = null;
             })
+
+            .addCase(refreshToken.fulfilled, (state, action) => {
+                const { accessToken, refreshToken } = action.payload.data;
+                state.accessToken = accessToken;
+                state.refreshToken = refreshToken;
+                state.isAuthenticated = true;
+              
+                // Save new tokens
+                tokenManager.setTokens({ accessToken, refreshToken });
+              })
+              .addCase(refreshToken.rejected, (state, action) => {
+                state.isAuthenticated = false;
+                state.accessToken = null;
+                state.refreshToken = null;
+                state.user = null;
+                state.error = action.payload?.message || 'Token refresh failed';
+              
+                localStorage.removeItem('user');
+                tokenManager.clearTokens();
+              })
+              
 
             .addCase(logout.fulfilled, (state) => {
                 state.loading = false;

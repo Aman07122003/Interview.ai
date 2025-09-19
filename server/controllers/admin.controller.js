@@ -259,80 +259,6 @@ const getCurrentAdmin = asyncHandler(async (req, res) => {
     .json(new APIResponse(200, req.admin, "Admin fetched Successfully"));
 });
 
-const updateAdminProfile = asyncHandler(async (req, res) => {
-  try {
-    const { fullName, company, position, expertise } = req.body;
-    const adminId = req.admin._id;
-
-    // Build update object
-    const updateData = {};
-    if (fullName) updateData.fullName = fullName;
-    if (company) updateData.company = company;
-    if (position) updateData.position = position;
-    if (expertise) {
-      updateData.expertise = typeof expertise === 'string' 
-        ? JSON.parse(expertise) 
-        : expertise;
-    }
-
-    // Handle avatar upload if provided
-    if (req.files && req.files.avatar && req.files.avatar.length > 0) {
-      const avatarLocalPath = req.files.avatar[0].path;
-      const avatarRes = await uploadOnCloudinary(avatarLocalPath);
-      
-      if (avatarRes) {
-        // Delete old avatar from Cloudinary if exists
-        if (req.admin.avatar) {
-          const publicId = req.admin.avatar.split('/').pop().split('.')[0];
-          await deleteImageOnCloudinary(publicId);
-        }
-        updateData.avatar = avatarRes.url;
-      }
-    }
-
-    const updatedAdmin = await Admin.findByIdAndUpdate(
-      adminId,
-      updateData,
-      { new: true, runValidators: true }
-    ).select("-password -refreshToken");
-
-    return res
-      .status(200)
-      .json(new APIResponse(200, updatedAdmin, "Profile updated successfully"));
-  } catch (error) {
-    console.error("Error updating admin profile:", error);
-    throw new APIError(500, "Failed to update profile");
-  }
-});
-
-const changeAdminPassword = asyncHandler(async (req, res) => {
-  try {
-    const { currentPassword, newPassword } = req.body;
-    const adminId = req.admin._id;
-
-    if (!currentPassword || !newPassword) {
-      throw new APIError(400, "Current password and new password are required");
-    }
-
-    const admin = await Admin.findById(adminId);
-    const isCurrentPasswordValid = await admin.isPasswordCorrect(currentPassword);
-
-    if (!isCurrentPasswordValid) {
-      throw new APIError(401, "Current password is incorrect");
-    }
-
-    admin.password = newPassword;
-    await admin.save({ validateBeforeSave: false });
-
-    return res
-      .status(200)
-      .json(new APIResponse(200, null, "Password changed successfully"));
-  } catch (error) {
-    console.error("Error changing password:", error);
-    throw new APIError(500, "Failed to change password");
-  }
-});
-
 // Interview Sessions
 const createInterviewSession = asyncHandler(async (req, res) => {
   try {
@@ -618,8 +544,6 @@ export {
   logoutAdmin,
   refreshAccessToken,
   getCurrentAdmin,
-  updateAdminProfile,
-  changeAdminPassword,
   createInterviewSession,
   getAdminInterviewSessions,
   getInterviewSession,

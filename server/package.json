@@ -2,16 +2,10 @@
   "name": "smart-interview-app-server",
   "version": "1.0.0",
   "type": "module",
-  "main": "app.js",
+  "main": "index.js",
   "scripts": {
-    "start": "node app.js",
-    "dev": "nodemon app.js",
-    "python:dev": "cd python_microservice && python session_monitor.py",
-    "python:docker": "cd python_microservice && docker build -t session-monitor . && docker run -p 8001:8001 session-monitor",
-    "test": "jest",
-    "test:watch": "jest --watch",
-    "lint": "eslint .",
-    "lint:fix": "eslint . --fix"
+    "dev": "nodemon -r dotenv/config --experimental-json-modules index.js",
+    "start": "node src/index.js"
   },
   "dependencies": {
     "axios": "^1.6.2",

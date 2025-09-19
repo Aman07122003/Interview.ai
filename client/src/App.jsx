@@ -55,11 +55,12 @@ function App() {
       />
       <Routes>
         <Route path="/" element={<Home />} />
-        <Route path="/interview" element={<InterviewLanding />} />
-        <Route path="/interview/start" element={<InterviewSession />} />
+        
+        <Route path="/interview/:sessionId" element={<InterviewLanding />} />
+        <Route path="/interview/:sessionId/start" element={<InterviewSession />} />
         <Route path="/user/dashboard" element={<Dashboard />} />
         <Route path="/add-questions" element={<AddQuestions />} />
-        <Route path="/admin" element={<Admin />} />
+
         <Route path="/candidates" element={<CandidatesPage />} />
         <Route path="/user-register" element={<UserRegister />} />
         <Route path="/login" element={<Login />} />
@@ -68,6 +69,9 @@ function App() {
         <Route path="/subscription/payment-success" element={<PaymentSuccess />} />
         <Route path="/subscription/payment-failure" element={<PaymentFailure />} />
         <Route path="/selectRole" element={<RoleRegister/>} />
+
+        
+        <Route path="/admin" element={<Admin />} />
         <Route path="/admin-register" element={<AdminRegister/>} />
         <Route path="/admin/login" element={<AdminLogin/>} />
         <Route path="/admin/Dashboard" element={<AdminDashboard/>} />
