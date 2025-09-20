@@ -2,7 +2,7 @@ import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import axios from 'axios';
 
 // Base URL for API calls
-const API_BASE_URL = 'http://localhost:3000/api';
+const API_BASE_URL = process.env.API_BASE_URL;
 
 // Create axios instance with interceptors
 const axiosInstance = axios.create({

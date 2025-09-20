@@ -2,7 +2,7 @@ import axios from 'axios';
 import  store  from '../src/store/store.js'; // Import your store
 import { logout, refreshAdminToken } from '../src/store/slice/adminAuthSlice.jsx';
 
-const API_BASE_URL = 'http://localhost:3000/api';
+const API_BASE_URL = process.env.API_BASE_URL;
 
 // Create axios instance
 const axiosInstanceAdmin = axios.create({
