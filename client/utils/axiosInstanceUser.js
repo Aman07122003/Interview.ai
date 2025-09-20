@@ -2,7 +2,7 @@ import axios from 'axios';
 import store from '../src/store/store.js';
 import { userLogout, refreshUserToken } from '../src/store/slice/authSlice.js';
 
-const API_BASE_URL = "http://localhost:3000/api"
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 const axiosInstanceUser = axios.create({
   baseURL: API_BASE_URL,
@@ -13,7 +13,11 @@ const axiosInstanceUser = axios.create({
 axiosInstanceUser.interceptors.request.use(
   (config) => {
     const state = store.getState();
-    const token = state.userAuth?.accessToken;
+    let token = state.userAuth?.accessToken;
+    if(!token) {
+      token = localStorage.getItem('userAccessToken');
+    }
+
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -23,18 +27,23 @@ axiosInstanceUser.interceptors.request.use(
 );
 
 // Response interceptor
+// Response interceptor - add detailed logging
 axiosInstanceUser.interceptors.response.use(
   (response) => response,
   async (error) => {
+    console.log("Interceptor error:", error.response);
     const originalRequest = error.config;
 
     if (error.response?.status === 401 && !originalRequest._retry) {
+      console.log("Attempting token refresh");
       originalRequest._retry = true;
 
       try {
         await store.dispatch(refreshUserToken()).unwrap();
         
-        const newToken = store.getState().userAuth.accessToken;
+        const newToken = store.getState().userAuth.accessToken || localStorage.getItem('userAccessToken');
+        console.log("New token:", newToken);
+        
         if (newToken) {
           originalRequest.headers.Authorization = `Bearer ${newToken}`;
           return axiosInstanceUser(originalRequest);
@@ -42,7 +51,7 @@ axiosInstanceUser.interceptors.response.use(
       } catch (refreshError) {
         console.error('Token refresh failed:', refreshError);
         store.dispatch(userLogout());
-        window.location.href = '/login'; // Redirect to login
+        window.location.href = '/login';
       }
     }
 

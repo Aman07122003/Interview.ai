@@ -1,34 +1,15 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import axiosInstanceUser from '../../../utils/axiosInstanceUser.js';
 
-// Start an interview session
-export const startInterviewSession = createAsyncThunk(
-  'interview/startSession',
-  async (sessionId, { rejectWithValue }) => {
-    try {
-      const response = await axiosInstanceUser.post(`/interview/start/${sessionId}`);
-      return response.data.data; // assuming API returns { data: {...} }
-    } catch (error) {
-      return rejectWithValue(error.response?.data?.message || error.message);
-    }
-  }
-);
-
-// Fetch interviews for current user
+// Fetch interviews for current user with pagination
 export const fetchInterviews = createAsyncThunk(
   'interview/fetchInterviews',
-  async (_, { getState, rejectWithValue }) => {
+  async (page = 1, { rejectWithValue }) => {
     try {
-      // Use token from Redux store or fallback to localStorage
-      const token = getState().userAuth?.accessToken || localStorage.getItem('userAccessToken');
-
-      const response = await axiosInstanceUser.get('/user/interviews', {
-        headers: {
-          Authorization: token ? `Bearer ${token}` : "",
-        },
-      });
-
-      return response.data.data || []; // ensure it's an array
+      const response = await axiosInstanceUser.get(`/user/interviews?page=${page}`);
+      console.log('Redux fetch response:', response.data);
+      
+      return response.data; // Return the entire response
     } catch (error) {
       return rejectWithValue(
         error.response?.data?.message || error.message || 'Failed to fetch interviews'
@@ -39,40 +20,30 @@ export const fetchInterviews = createAsyncThunk(
 
 const initialState = {
   interviews: [],
-  currentSession: null,
   loading: false,
   error: null,
-  resultId: null,
+  pagination: {
+    page: 1,
+    totalPages: 1,
+    totalDocs: 0,
+    hasNext: false,
+    hasPrev: false,
+  }
 };
 
 const interviewSlice = createSlice({
   name: 'interview',
   initialState,
   reducers: {
-    clearInterview: (state) => {
-      state.currentSession = null;
-      state.resultId = null;
+    clearInterviewError: (state) => {
       state.error = null;
-      state.loading = false;
+    },
+    setPage: (state, action) => {
+      state.pagination.page = action.payload;
     },
   },
   extraReducers: (builder) => {
     builder
-      // Start interview session
-      .addCase(startInterviewSession.pending, (state) => {
-        state.loading = true;
-        state.error = null;
-      })
-      .addCase(startInterviewSession.fulfilled, (state, action) => {
-        state.loading = false;
-        state.resultId = action.payload._id;
-        state.currentSession = action.payload;
-      })
-      .addCase(startInterviewSession.rejected, (state, action) => {
-        state.loading = false;
-        state.error = action.payload;
-      })
-
       // Fetch interviews
       .addCase(fetchInterviews.pending, (state) => {
         state.loading = true;
@@ -80,14 +51,24 @@ const interviewSlice = createSlice({
       })
       .addCase(fetchInterviews.fulfilled, (state, action) => {
         state.loading = false;
-        state.interviews = action.payload; // always an array
+        state.interviews = action.payload.docs || [];
+        
+        // Store pagination info
+        state.pagination = {
+          page: action.payload.page || 1,
+          totalPages: action.payload.totalPages || 1,
+          totalDocs: action.payload.totalDocs || 0,
+          hasNext: action.payload.hasNextPage || false,
+          hasPrev: action.payload.hasPrevPage || false,
+        };
       })
       .addCase(fetchInterviews.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
-        state.interviews = []; // reset on error
+        state.interviews = [];
       });
   },
 });
 
+export const { clearInterviewError, setPage } = interviewSlice.actions;
 export default interviewSlice.reducer;

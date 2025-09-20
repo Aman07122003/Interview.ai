@@ -2,7 +2,8 @@ import axios from 'axios';
 import store from '../src/store/store.js'; // Import your Redux store
 import { userLogout, refreshUserToken } from '../src/store/slice/authSlice.js'; // <-- use user slice
 
-const API_BASE_URL = "http://localhost:3000/api"
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+
 
 // Create axios instance for normal user
 const axiosInstanceUser = axios.create({
