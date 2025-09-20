@@ -5,7 +5,7 @@ import morgan from "morgan";
 const app = express();
 
 const allowedOrigins = [
-  "http://localhost:5173",
+  "https://interview-ai-frontend-q4s3.onrender.com",
 ]
 
 app.use(cors({
