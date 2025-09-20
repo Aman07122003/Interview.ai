@@ -24,7 +24,6 @@ const AdminDashboard = () => {
   });
 
   useEffect(() => {
-    dispatch(getCurrentAdmin());
     dispatch(getAdminInterviewSessions());
   }, [dispatch]);
 

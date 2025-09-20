@@ -2,11 +2,10 @@ import React from 'react';
 import { useRef, useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate, Link } from 'react-router-dom';
-import { logout, getCurrentUser } from '../store/slice/authSlice';
+import { userLogout, getCurrentUser } from '../store/slice/authSlice';
 import inter from '../../src/assets/inter.png';
-import { BrainCircuit, BrainCircuitIcon, ChartBarBig, ChartNoAxesCombined, LibraryBig, Mail, Mic, Phone, Rocket, Target } from "lucide-react";
+import { BrainCircuit, ChartBarBig, ChartNoAxesCombined, LibraryBig, Mail, Mic, Phone, Rocket, Target } from "lucide-react";
 import axiosInstanceUser from '../../utils/axiosInstanceUser';
-import axios from 'axios';
 
 // LogoutButton component
 const LogoutButton = () => {
@@ -16,7 +15,7 @@ const LogoutButton = () => {
   const handleLogout = async () => {
     try {
       // Dispatch the logout action which will handle everything
-      await dispatch(logout()).unwrap();
+      await dispatch(userLogout()).unwrap();
       
       // Navigate to home page after successful logout
       navigate('/');
@@ -45,8 +44,8 @@ const Home = () => {
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const profileMenuRef = useRef(null);
   const dispatch = useDispatch();
-  const user = useSelector((state) => state.auth.user);
-  const accessToken = useSelector((state) => state.auth.accessToken);
+  const user = useSelector((state) => state.userAuth.user);
+  const accessToken = useSelector((state) => state.userAuth.accessToken);
   const isAuthenticated = !!(user && accessToken);
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
@@ -58,7 +57,7 @@ const Home = () => {
     // Fetch plans from your API
     const fetchPlans = async () => {
       try {
-        const response = await axios.get("http://localhost:3000/api/subscription/plans");
+        const response = await axiosInstanceUser.get("subscription/plans");
         console.log(response.data);
         if (response.data.success) {
           setPlans(response.data.plans);

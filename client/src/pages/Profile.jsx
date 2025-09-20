@@ -19,7 +19,7 @@ import {
   FiUpload,
   FiCamera
 } from 'react-icons/fi';
-import { logout, getCurrentUser } from '../store/slice/authSlice';
+import { userLogout, getCurrentUser } from '../store/slice/authSlice';
 import { updateUserProfile } from '../store/slice/userSlice';
 import { updateUserAvatar } from '../services/api/profile';
 import { toast } from 'react-hot-toast';

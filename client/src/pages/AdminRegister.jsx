@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
-import { registerAdmin } from '../store/slice/adminAuthSlice.jsx'; // You'll need to create this
+import { registerAdmin } from '../store/slice/adminAuthSlice.js'; // You'll need to create this
 
 const AdminRegister = () => {
   const [formData, setFormData] = useState({

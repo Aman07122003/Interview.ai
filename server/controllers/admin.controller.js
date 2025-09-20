@@ -252,14 +252,12 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
   }
 });
 
-// Profile
 const getCurrentAdmin = asyncHandler(async (req, res) => {
   return res
     .status(200)
     .json(new APIResponse(200, req.admin, "Admin fetched Successfully"));
 });
 
-// Interview Sessions
 const createInterviewSession = asyncHandler(async (req, res) => {
   try {
     const {
@@ -330,9 +328,6 @@ const createInterviewSession = asyncHandler(async (req, res) => {
   }
 });
 
-
-
-// Get all interview sessions for an admin
 const getAdminInterviewSessions = asyncHandler(async (req, res) => {
   try {
     const adminId = req.admin._id;
@@ -382,8 +377,6 @@ const getAdminInterviewSessions = asyncHandler(async (req, res) => {
   }
 });
 
-
-// Get single interview session by ID
 const getInterviewSession = asyncHandler(async (req, res) => {
   try {
     const { sessionId } = req.params;
@@ -414,7 +407,6 @@ const getInterviewSession = asyncHandler(async (req, res) => {
   }
 });
 
-// Update interview session
 const updateInterviewSession = asyncHandler(async (req, res) => {
   try {
     const { sessionId } = req.params;
@@ -456,7 +448,6 @@ const updateInterviewSession = asyncHandler(async (req, res) => {
   }
 });
 
-// Delete interview session
 const deleteInterviewSession = asyncHandler(async (req, res) => {
   try {
     const { sessionId } = req.params;
@@ -495,7 +486,6 @@ const deleteInterviewSession = asyncHandler(async (req, res) => {
   }
 });
 
-// Update session status
 const updateSessionStatus = asyncHandler(async (req, res) => {
   try {
     const { sessionId } = req.params;

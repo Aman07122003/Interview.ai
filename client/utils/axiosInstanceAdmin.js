@@ -1,8 +1,8 @@
 import axios from 'axios';
 import  store  from '../src/store/store.js'; // Import your store
-import { logout, refreshAdminToken } from '../src/store/slice/adminAuthSlice.jsx';
+import { logoutAdmin, refreshAdminToken } from '../src/store/slice/adminAuthSlice.js';
 
-const API_BASE_URL = process.env.API_BASE_URL;
+const API_BASE_URL = "http://localhost:3000/api"
 
 // Create axios instance
 const axiosInstanceAdmin = axios.create({
@@ -44,7 +44,7 @@ axiosInstanceAdmin.interceptors.response.use(
         return axiosInstanceAdmin(originalRequest);
       } catch (refreshError) {
         // If refresh fails, logout the user
-        store.dispatch(logout());
+        store.dispatch(logoutAdmin());
         return Promise.reject(refreshError);
       }
     }

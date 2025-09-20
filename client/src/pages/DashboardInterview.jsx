@@ -1,37 +1,28 @@
 import React, { useEffect, useState } from "react";
-import axiosInstanceUser from "../../utils/axiosInstanceUser";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
+import { useDispatch, useSelector } from "react-redux";
+import { fetchInterviews } from "../store/slice/interviewSlice";
 
 const DashboardInterview = () => {
-  const [sessions, setSessions] = useState([]);
   const [timeLeft, setTimeLeft] = useState({});
   const navigate = useNavigate();
+  const dispatch = useDispatch();
 
-  // Fetch sessions
+  const { interviews = [], loading, error } = useSelector((state) => state.interview);
+
   useEffect(() => {
-    const fetchSessions = async () => {
-      try {
-        const { data } = await axiosInstanceUser.get("/admin/interview-sessions");
-        console.log(data);
-        setSessions(data.data.sessions || []);
-      } catch (error) {
-        console.error("Error fetching sessions:", error);
-      }
-    };
-
-    fetchSessions();
-  }, []);
+    dispatch(fetchInterviews());
+  }, [dispatch]);
 
   // Countdown timers
   useEffect(() => {
-    if (sessions.length === 0) return;
-
+    if (!interviews || interviews.length === 0) return;
+    
     const interval = setInterval(() => {
       const updated = {};
-      sessions.forEach((session) => {
+      interviews.forEach((session) => {
         const eventTime = new Date(session.scheduledAt).getTime();
-        const now = new Date().getTime();
+        const now = Date.now();
         const diff = eventTime - now;
 
         if (diff > 0) {
@@ -49,53 +40,31 @@ const DashboardInterview = () => {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [sessions]);
+  }, [interviews]);
 
-  // Handle "Start Interview"
-  // when user clicks "Start"
   const handleStartInterview = (session) => {
     navigate(`/interview/${session._id}`, { state: { session } });
   };
-  
-  
 
-  if (sessions.length === 0) {
+  if (loading) return <p className="text-gray-400">Loading interviews...</p>;
+  if (error) return <p className="text-red-400">Error: {error}</p>;
+  if (!interviews || interviews.length === 0) {
     return <p className="text-gray-400">No upcoming interviews</p>;
   }
 
   return (
     <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-      {sessions.map((session) => (
+      {interviews.map((session) => (
         <button
           key={session._id}
           onClick={() => handleStartInterview(session)}
           className="bg-gray-900 border border-gray-700 rounded-2xl p-5 shadow-lg text-white text-left hover:border-purple-500 transition"
         >
-          <h2 className="text-lg font-bold mb-1">{session.title}</h2>
-          <p className="text-sm text-gray-400 mb-3">{session.description}</p>
+          <h2 className="text-lg font-bold mb-1">{session.title || "Interview"}</h2>
+          <p className="text-sm text-gray-400 mb-3">
+            {session.description || "No description"}
+          </p>
 
-          {/* Interviewer */}
-          <div className="flex items-center space-x-3 mb-3">
-            <img
-              src={session.createdBy.avatar}
-              alt={session.createdBy.fullName}
-              className="w-10 h-10 rounded-full object-cover border border-gray-600"
-            />
-            <div>
-              <p className="font-medium">{session.createdBy.fullName}</p>
-              <p className="text-xs text-gray-400">Interviewer</p>
-            </div>
-          </div>
-
-          {/* Participants */}
-          <div className="mb-3">
-            <p className="text-xs text-gray-400">Participants:</p>
-            {session.participants.map((p) => (
-              <p key={p._id} className="text-sm">{p.fullName} ({p.email})</p>
-            ))}
-          </div>
-
-          {/* Countdown */}
           {timeLeft[session._id] ? (
             <div className="flex justify-between text-center bg-gray-800 rounded-xl p-3">
               <div>

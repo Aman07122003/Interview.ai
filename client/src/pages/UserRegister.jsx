@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
-import { register } from '../store/slice/authSlice';
+import {userRegister } from '../store/slice/authSlice';
 
 const UserRegister = () => {
   const [formData, setFormData] = useState({
@@ -139,7 +139,7 @@ const UserRegister = () => {
 
     try{
         setIsLoading(true);
-        await dispatch(register(payload)).unwrap();
+        await dispatch(userRegister(payload)).unwrap();
         navigate('/login');
     }catch(error){
         console.error('Registration error:', error);

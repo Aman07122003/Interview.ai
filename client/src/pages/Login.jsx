@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
-import { login } from '../store/slice/authSlice';
+import { userLogin } from '../store/slice/authSlice.js';
 
 const Login = () => {
   const [formData, setFormData] = useState({
@@ -62,11 +62,11 @@ const Login = () => {
 
     try {
       setIsLoading(true);
-      await dispatch(login(formData)).unwrap();
+      await dispatch(userLogin(formData)).unwrap();
       navigate('/user/dashboard');
     } catch (error) {
       console.error('Login error:', error);
-      setErrors({ submit: error.message || 'Login failed. Please check your credentials.' });
+      setErrors({ submit: error?.message || error?.msg || 'Login failed. Please check your credentials.' });
     } finally {
       setIsLoading(false);
     }

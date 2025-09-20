@@ -14,6 +14,7 @@ import {
   getInterviewHistory,
   uploadAvatar,
   getUserStats,
+  getUserInterviews,
 } from "../controllers/user.controller.js";
 
 const router = express.Router();
@@ -38,7 +39,7 @@ router.post('/avatar', auth,
   uploadAvatar
 );
 router.get('/stats', auth, getUserStats);
-router.get('/interviews', auth, getInterviewHistory);
+router.get('/interviews', auth, getUserInterviews);
 router.get('/interviews/:interviewId', auth, getInterviewHistory);
 router.put('/avatar', auth, upload.single('avatar'), updateUserAvatar);
 

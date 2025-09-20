@@ -1,8 +1,8 @@
 import axios from 'axios';
 import store from '../src/store/store.js'; // Import your Redux store
-import { logout, refreshToken } from '../src/store/slice/authSlice.jsx'; // <-- use user slice
+import { userLogout, refreshUserToken } from '../src/store/slice/authSlice.js'; // <-- use user slice
 
-const API_BASE_URL = process.env.API_BASE_URL;
+const API_BASE_URL = "http://localhost:3000/api"
 
 // Create axios instance for normal user
 const axiosInstanceUser = axios.create({
@@ -34,7 +34,7 @@ axiosInstanceUser.interceptors.response.use(
 
       try {
         // Dispatch refresh token from user slice
-        await store.dispatch(refreshToken()).unwrap();
+        await store.dispatch(refreshUserToken()).unwrap();
 
         // Get updated access token
         const newToken = store.getState().auth.accessToken;
@@ -44,7 +44,7 @@ axiosInstanceUser.interceptors.response.use(
         return axiosInstanceUser(originalRequest);
       } catch (refreshError) {
         // If refresh fails, logout user
-        store.dispatch(logout());
+        store.dispatch(userLogout());
         return Promise.reject(refreshError);
       }
     }

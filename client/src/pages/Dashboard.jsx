@@ -30,7 +30,8 @@ const Dashboard = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
-  const user = useSelector((state) => state.auth.user);
+  const user = useSelector((state) => state.userAuth.user);
+  console.log('User from Redux:', user);
   
   // Check if device is mobile on component mount and resize
   useEffect(() => {

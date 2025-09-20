@@ -10,7 +10,6 @@ const AddQuestions = () => {
     difficulty: '',
     title: '',
     description: '',
-    difficulty: '',
     tags: ''
   });
 
@@ -101,7 +100,6 @@ const AddQuestions = () => {
         difficulty: '',
         title: '',
         description: '',
-        difficulty: '',
         tags: ''
       });
 

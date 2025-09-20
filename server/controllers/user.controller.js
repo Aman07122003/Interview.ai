@@ -8,7 +8,7 @@ import {
 import { APIResponse } from "../utils/APIResponse.js";
 import jwt from "jsonwebtoken";
 import mongoose from "mongoose";
-import { Interview } from "../models/Interview.js";
+import { InterviewSession } from "../models/interviewSession.model.js";
 
 
 const generateAccessAndRefreshToken = async (_id) => {
@@ -289,8 +289,6 @@ const generateAccessAndRefreshToken = async (_id) => {
     }
   });
   
-  // TODO Remove password from response.... .lean()
-  
   const changePassword = asyncHandler(async (req, res) => {
     const { oldPassword, newPassword } = req.body;
   
@@ -440,7 +438,6 @@ const generateAccessAndRefreshToken = async (_id) => {
     );
   });
 
-  // TODO Get Proper InterviewHistory
   const getNewInterviewHistory = asyncHandler(async (req, res) => {
     const userInterviewHistory = await User.aggregate([
       {
@@ -526,20 +523,20 @@ const generateAccessAndRefreshToken = async (_id) => {
       .json(new APIResponse(200, userInterviewHistory, "Interview history grouped by date"));
   });
   
-  
   const getInterviewHistory = asyncHandler(async (req, res) => {
     const userInterviewHistory = await User.aggregate([
       {
-        $match: {
-          _id: new mongoose.Types.ObjectId(req.user._id),
-        },
+        $match: { _id: new mongoose.Types.ObjectId(req.user._id) }
+      },
+      {
+        $unwind: "$interviewHistory"
       },
       {
         $lookup: {
           from: "interviews",
           localField: "interviewHistory.interview",
           foreignField: "_id",
-          as: "interviewHistory",
+          as: "interview",
           pipeline: [
             {
               $lookup: {
@@ -548,38 +545,33 @@ const generateAccessAndRefreshToken = async (_id) => {
                 foreignField: "_id",
                 as: "coach",
                 pipeline: [
-                  {
-                    $project: {
-                      username: 1,
-                      fullName: 1,
-                      avatar: 1,
-                    },
-                  },
-                ],
-              },
+                  { $project: { username: 1, fullName: 1, avatar: 1 } }
+                ]
+              }
             },
-            {
-              $addFields: {
-                coach: { $first: "$coach" },
-              },
-            },
-          ],
-        },
+            { $addFields: { coach: { $first: "$coach" } } }
+          ]
+        }
+      },
+      {
+        $addFields: {
+          interview: { $first: "$interview" }
+        }
       },
       {
         $project: {
-          interviewHistory: 1,
-        },
+          _id: "$interviewHistory._id",
+          createdAt: "$interviewHistory.createdAt",
+          interview: 1
+        }
       },
+      { $sort: { createdAt: -1 } } // reverse order, latest first
     ]);
-  
-    const flatHistory = userInterviewHistory?.[0]?.interviewHistory?.reverse() || [];
   
     return res
       .status(200)
-      .json(new APIResponse(200, flatHistory, "Interview history fetched successfully"));
+      .json(new APIResponse(200, userInterviewHistory, "Interview history fetched successfully"));
   });
-  
   
   const uploadAvatar = asyncHandler(async (req, res) => {
     const avatarLocalPath = req.file?.path;
@@ -720,127 +712,75 @@ const generateAccessAndRefreshToken = async (_id) => {
     );
   });
   
-  const getUserInterviews = asyncHandler(async (req, res) => {
-    const { 
-      page = 1, 
-      limit = 10, 
-      status, 
-      category, 
-      sortBy = "createdAt", 
-      sortOrder = "desc" 
-    } = req.query;
+  const getUserInterviews = async (req, res) => {
+    try {
+      const userId = req.user._id;
+      const page = parseInt(req.query.page, 10) || 1;
+      const limit = parseInt(req.query.limit, 10) || 10;
   
-    // Validate pagination parameters
-    const pageNum = parseInt(page);
-    const limitNum = parseInt(limit);
-    
-    if (pageNum < 1 || limitNum < 1 || limitNum > 50) {
-      throw new APIError(400, "Invalid pagination parameters");
-    }
-  
-    // Build filter object
-    const filter = { user: req.user._id };
-    
-    if (status) {
-      const validStatuses = ["in-progress", "completed"];
-      if (!validStatuses.includes(status)) {
-        throw new APIError(400, "Invalid status filter");
-      }
-      filter.status = status;
-    }
-  
-    if (category) {
-      const validCategories = [
-        "javascript", "react", "nodejs", "python", "java", "cpp", 
-        "dsa", "oop", "dbms", "system-design", "frontend", "backend",
-        "fullstack", "devops", "machine-learning", "general"
-      ];
-      if (!validCategories.includes(category)) {
-        throw new APIError(400, "Invalid category filter");
-      }
-      filter.category = category;
-    }
-  
-    // Validate sort parameters
-    const validSortFields = ["createdAt", "completedAt", "score", "category"];
-    const validSortOrders = ["asc", "desc"];
-    
-    if (!validSortFields.includes(sortBy)) {
-      throw new APIError(400, "Invalid sort field");
-    }
-    
-    if (!validSortOrders.includes(sortOrder)) {
-      throw new APIError(400, "Invalid sort order");
-    }
-  
-    // Build sort object
-    const sort = {};
-    sort[sortBy] = sortOrder === "desc" ? -1 : 1;
-  
-    // Calculate skip value for pagination
-    const skip = (pageNum - 1) * limitNum;
-  
-    // Execute query with pagination
-    const interviews = await Interview.find(filter)
-      .sort(sort)
-      .skip(skip)
-      .limit(limitNum)
-      .select("category status score completedAt createdAt questions")
-      .lean();
-  
-    // Get total count for pagination metadata
-    const totalInterviews = await Interview.countDocuments(filter);
-    const totalPages = Math.ceil(totalInterviews / limitNum);
-  
-    // Calculate interview statistics for the filtered results
-    const interviewStats = await Interview.aggregate([
-      { $match: filter },
-      {
-        $group: {
-          _id: null,
-          totalQuestions: { $sum: { $size: "$questions" } },
-          answeredQuestions: {
-            $sum: {
-              $size: {
-                $filter: {
-                  input: "$questions",
-                  cond: { $ne: ["$$this.answerText", null] }
-                }
-              }
-            }
+      const aggregate = InterviewSession.aggregate([
+        {
+          $match: {
+            participants: new mongoose.Types.ObjectId(userId),
           },
-          averageScore: { $avg: "$score" }
-        }
-      }
-    ]);
-  
-    const stats = interviewStats[0] || {
-      totalQuestions: 0,
-      answeredQuestions: 0,
-      averageScore: 0
-    };
-  
-    return res.status(200).json(
-      new APIResponse(200, {
-        interviews,
-        stats: {
-          ...stats,
-          averageScore: parseFloat(stats.averageScore.toFixed(2)) || 0,
-          answerRate: stats.totalQuestions > 0 
-            ? parseFloat(((stats.answeredQuestions / stats.totalQuestions) * 100).toFixed(2))
-            : 0
         },
-        pagination: {
-          currentPage: pageNum,
-          totalPages,
-          totalInterviews,
-          hasNextPage: pageNum < totalPages,
-          hasPrevPage: pageNum > 1,
+        {
+          $lookup: {
+            from: "admins", // because createdBy is Admin
+            localField: "createdBy",
+            foreignField: "_id",
+            as: "createdBy",
+          },
         },
-      }, "User interviews retrieved successfully")
-    );
-  });
+        { $unwind: "$createdBy" },
+        {
+          $lookup: {
+            from: "users",
+            localField: "participants",
+            foreignField: "_id",
+            as: "participants",
+          },
+        },
+        {
+          $project: {
+            title: 1,
+            description: 1,
+            status: 1,
+            scheduledAt: 1,
+            createdAt: 1,
+            updatedAt: 1,
+            "createdBy._id": 1,
+            "createdBy.fullName": 1,
+            "createdBy.email": 1,
+            "createdBy.avatar": 1,
+            "participants._id": 1,
+            "participants.fullName": 1,
+            "participants.email": 1,
+          },
+        },
+        { $sort: { scheduledAt: 1 } },
+      ]);
   
+      const result = await InterviewSession.aggregatePaginate(aggregate, {
+        page,
+        limit,
+      });
+  
+      res.status(200).json({
+        success: true,
+        ...result,
+        message: "User interviews fetched successfully",
+      });
+    } catch (error) {
+      console.error("Error fetching user interviews:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to fetch user interviews",
+        error: error.message,
+      });
+    }
+  };
+
   export {
     registerUser,
     loginUser,

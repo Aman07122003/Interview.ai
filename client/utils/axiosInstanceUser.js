@@ -1,19 +1,19 @@
 import axios from 'axios';
-import store from '../src/store/store.js'; // Import your Redux store
-import { logout, refreshToken } from '../src/store/slice/authSlice.jsx'; // 
+import store from '../src/store/store.js';
+import { userLogout, refreshUserToken } from '../src/store/slice/authSlice.js';
 
-const API_BASE_URL = process.env.API_BASE_URL;
+const API_BASE_URL = "http://localhost:3000/api"
 
-// Create axios instance for normal user
 const axiosInstanceUser = axios.create({
   baseURL: API_BASE_URL,
   withCredentials: true,
 });
 
-// Request interceptor to add auth token
+// Request interceptor
 axiosInstanceUser.interceptors.request.use(
   (config) => {
-    const token = store.getState().auth.accessToken; // <-- user auth state
+    const state = store.getState();
+    const token = state.userAuth?.accessToken;
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -22,30 +22,27 @@ axiosInstanceUser.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Response interceptor to handle token refresh
+// Response interceptor
 axiosInstanceUser.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
 
-    // Handle expired access token
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
 
       try {
-        // Dispatch refresh token from user slice
-        await store.dispatch(refreshToken()).unwrap();
-
-        // Get updated access token
-        const newToken = store.getState().auth.accessToken;
-        originalRequest.headers.Authorization = `Bearer ${newToken}`;
-
-        // Retry the original request
-        return axiosInstanceUser(originalRequest);
+        await store.dispatch(refreshUserToken()).unwrap();
+        
+        const newToken = store.getState().userAuth.accessToken;
+        if (newToken) {
+          originalRequest.headers.Authorization = `Bearer ${newToken}`;
+          return axiosInstanceUser(originalRequest);
+        }
       } catch (refreshError) {
-        // If refresh fails, logout user
-        store.dispatch(logout());
-        return Promise.reject(refreshError);
+        console.error('Token refresh failed:', refreshError);
+        store.dispatch(userLogout());
+        window.location.href = '/login'; // Redirect to login
       }
     }
 

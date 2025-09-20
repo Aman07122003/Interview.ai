@@ -1,162 +1,86 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import axios from 'axios';
-
-// Base URL for API calls
-const API_BASE_URL = process.env.API_BASE_URL;
-
-// Create axios instance with interceptors
-const axiosInstance = axios.create({
-  baseURL: API_BASE_URL,
-  withCredentials: true,
-});
-
-// Request interceptor to add auth token
-axiosInstance.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('adminAccessToken');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
-  }
-);
+import axiosInstanceAdmin from '../../../utils/axiosInstanceAdmin';
 
 // Async thunk for admin registration
-export const registerAdmin = createAsyncThunk(
-  'adminAuth/register',
-  async (formData, { rejectWithValue }) => {
+export const registerAdmin = createAsyncThunk( '/admin/register',
+  async (formData) => {
     try {
-      const response = await axios.post(`${API_BASE_URL}/admin/register`, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-        withCredentials: true,
-      });
-
+      const response = await axiosInstanceAdmin.post('/admin/register', formData,);
       return response.data;
     } catch (error) {
-      return rejectWithValue(
-        error.response?.data?.message || 
-        error.message || 
-        'Registration failed. Please try again.'
-      );
+      return error.response?.data?.message || error.message || 'Registration failed. Please try again.'
     }
   }
 );
 
 // Async thunk for admin login
-export const loginAdmin = createAsyncThunk(
-  'adminAuth/login',
-  async (credentials, { rejectWithValue }) => {
+export const loginAdmin = createAsyncThunk( '/admin/login',
+  async (credentials) => {
     try {
-      const response = await axios.post(`${API_BASE_URL}/admin/login`, credentials, {
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        withCredentials: true,
-      });
-
+      const response = await axiosInstanceAdmin.post('/admin/login', credentials);
       return response.data;
     } catch (error) {
-      return rejectWithValue(
-        error.response?.data?.message || 
-        error.message || 
-        'Login failed. Please try again.'
-      );
+      return error.response?.data?.message || error.message || 'Login failed. Please try again.'
     }
   }
 );
 
 // Async thunk for creating interview session
-export const createInterviewSession = createAsyncThunk(
-  'adminAuth/createInterviewSession',
-  async (sessionData, { rejectWithValue }) => {
+export const createInterviewSession = createAsyncThunk('admin/interview-sessions',
+  async (sessionData) => {
     try {
-      const response = await axiosInstance.post(`${API_BASE_URL}/admin/interview-sessions`, sessionData);
+      const response = await axiosInstanceAdmin.post('admin/interview-sessions', sessionData);
       return response.data;
     } catch (error) {
-      return rejectWithValue(
-        error.response?.data?.message || 
-        error.message || 
-        'Failed to create interview session'
-      );
+      return error.response?.data?.message || error.message || 'Failed to create interview session'
     }
   }
 );
 
 // Async thunk for admin logout
-export const logoutAdmin = createAsyncThunk(
-  'adminAuth/logout',
-  async (_, { rejectWithValue }) => {
+export const logoutAdmin = createAsyncThunk('/admin/logout',
+  async () => {
     try {
-      const response = await axios.post(`${API_BASE_URL}/admin/logout`, {}, {
-        withCredentials: true,
-      });
-
+      const response = await axiosInstanceAdmin.post('/admin/logout');
       return response.data;
     } catch (error) {
-      return rejectWithValue(
-        error.response?.data?.message || 
-        error.message || 
-        'Logout failed. Please try again.'
-      );
+      return error.response?.data?.message || error.message || 'Logout failed. Please try again.'
     }
   }
 );
 
 // Get admin interview sessions
-export const getAdminInterviewSessions = createAsyncThunk(
-  'adminAuth/getInterviewSessions',
-  async (_, { rejectWithValue }) => {
+export const getAdminInterviewSessions = createAsyncThunk( '/admin/interview-sessions', 
+  async () => {
     try {
-      const response = await axiosInstance.get(`${API_BASE_URL}/admin/interview-sessions`);
+      const response = await axiosInstanceAdmin.get('/admin/interview-sessions');
       return response.data;
     } catch (error) {
-      return rejectWithValue(
-        error.response?.data?.message || 
-        error.message || 
-        'Failed to fetch interview sessions'
-      );
+      throw error.response?.data?.message || error.message || 'Failed to fetch interview sessions';
     }
   }
 );
 
 // Async thunk for refreshing token
-export const refreshAdminToken = createAsyncThunk(
-  'adminAuth/refreshToken',
-  async (_, { rejectWithValue }) => {
+export const refreshAdminToken = createAsyncThunk( '/admin/refresh-token',
+  async () => {
     try {
-      const response = await axios.post(`${API_BASE_URL}/admin/refresh-token`, {}, {
-        withCredentials: true,
-      });
-
+      const response = await axiosInstanceAdmin.post('/admin/refresh-token');
       return response.data;
     } catch (error) {
-      return rejectWithValue(
-        error.response?.data?.message || 
-        error.message || 
-        'Token refresh failed. Please login again.'
-      );
+      throw error.response?.data?.message || error.message || 'Token refresh failed. Please login again.';
     }
   }
 );
 
 // Async thunk for getting current admin
-export const getCurrentAdmin = createAsyncThunk(
-  'adminAuth/getCurrentAdmin',
-  async (_, { rejectWithValue }) => {
+export const getCurrentAdmin = createAsyncThunk('/admin/profile',
+  async () => {
     try {
-      const response = await axiosInstance.get(`${API_BASE_URL}/admin/profile`);
+      const response = await axiosInstanceAdmin.get('/admin/profile');
       return response.data;
     } catch (error) {
-      return rejectWithValue(
-        error.response?.data?.message || 
-        error.message || 
-        'Failed to fetch admin profile'
-      );
+      return error.response?.data?.message || error.message || 'Failed to fetch admin profile'
     }
   }
 );
@@ -222,7 +146,7 @@ const adminAuthSlice = createSlice({
       })
       .addCase(registerAdmin.rejected, (state, action) => {
         state.isLoading = false;
-        state.error = action.payload;
+        state.error = action.payload.message || 'Registration failed';
       })
       
       // Login Admin
@@ -233,7 +157,7 @@ const adminAuthSlice = createSlice({
       .addCase(loginAdmin.fulfilled, (state, action) => {
         state.isLoading = false;
         state.error = null;
-        const { admin, accessToken, refreshToken } = action.payload.data;
+        const { admin, accessToken, refreshToken } = action.payload;
         state.admin = admin;
         state.accessToken = accessToken;
         state.refreshToken = refreshToken;
@@ -293,8 +217,7 @@ const adminAuthSlice = createSlice({
       })
       .addCase(logoutAdmin.rejected, (state, action) => {
         state.isLoading = false;
-        state.error = action.payload;
-        // Still logout even if the server call fails
+        state.error = action.payload.message || 'Logout failed';
         state.admin = null;
         state.interviewSessions = [];
         state.accessToken = null;
@@ -361,15 +284,5 @@ const adminAuthSlice = createSlice({
       });
   },
 });
-
-export const { clearError, setCredentials, logout, clearInterviewSessions } = adminAuthSlice.actions;
-
-// Selectors
-export const selectAdmin = (state) => state.adminAuth.admin;
-export const selectAdminInterviewSessions = (state) => state.adminAuth.interviewSessions;
-export const selectAdminAccessToken = (state) => state.adminAuth.accessToken;
-export const selectAdminIsAuthenticated = (state) => state.adminAuth.isAuthenticated;
-export const selectAdminIsLoading = (state) => state.adminAuth.isLoading;
-export const selectAdminError = (state) => state.adminAuth.error;
 
 export default adminAuthSlice.reducer;

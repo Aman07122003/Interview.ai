@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
-import { loginAdmin, clearError } from '../store/slice/adminAuthSlice';
+import { loginAdmin } from '../store/slice/adminAuthSlice';
 
 const AdminLogin = () => {
   const [formData, setFormData] = useState({

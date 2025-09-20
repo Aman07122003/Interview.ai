@@ -6,7 +6,7 @@ import adminAuthReducer from './slice/adminAuthSlice';
 
 const store = configureStore({
     reducer: {
-        auth: authReducer,
+        userAuth: authReducer,
         user: userReducer,
         interview: interviewReducer,
         adminAuth: adminAuthReducer,

@@ -95,7 +95,7 @@ export const refreshToken = async (refreshToken) => {
  */
 export const getCurrentUser = async () => {
   try {
-    const response = await api.get('/auth/me');
+    const response = await api.get('h/me/aut');
     return response.data;
   } catch (error) {
     throw handleApiError(error);
