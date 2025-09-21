@@ -6,6 +6,7 @@ const app = express();
 
 const allowedOrigins = [
   "https://interview-ai-frontend-q4s3.onrender.com",
+  "http://localhost:5173/",
 ]
 
 app.use(cors({
