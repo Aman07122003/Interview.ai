@@ -6,7 +6,7 @@ const app = express();
 
 const allowedOrigins = [
   "https://interview-ai-frontend-q4s3.onrender.com",
-  "http://localhost:5173/",
+  "http://localhost:5173",
 ]
 
 app.use(cors({
@@ -28,10 +28,11 @@ import adminRoutes from "./routes/admin.routes.js";
 
 
 
-
+app.get("/api/login", (req, res) => {
+  res.send("Auth route alive ✅, use POST to log in.");
+});
 app.use('/api/subscription', subscriptionRoutes);
 app.use('/api/auth', authRoutes);
-app.use('/api/subscription', subscriptionRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/interview', interviewRoutes);
 app.use('/api/questions', questionRoutes);
