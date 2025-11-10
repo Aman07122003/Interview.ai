@@ -41,10 +41,7 @@ export const userLogout = createAsyncThunk(
   '/auth/logout',
   async (_, { getState, rejectWithValue }) => {
     try {
-      const token = getState().userAuth.accessToken || localStorage.getItem("userAccessToken");
-      await axiosInstanceUser.post('/auth/logout', null, {
-        headers: { Authorization: token ? `Bearer ${token}` : "" },
-      });
+      await axiosInstanceUser.post('/auth/logout');
       return true;
     } catch (error) {
       return rejectWithValue(error.response?.data || { message: 'Logout failed' });
