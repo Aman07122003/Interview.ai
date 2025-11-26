@@ -70,8 +70,6 @@ const Home = () => {
     fetchPlans();
   }, []);
 
-  console.log(user);
-
   // Payment verification function
   const verifyPayment = async (paymentResponse, subscriptionId) => {
     try {

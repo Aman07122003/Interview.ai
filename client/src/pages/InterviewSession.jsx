@@ -1,466 +1,270 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useSelector } from 'react-redux';
 
-const Interview = () => {
-  const navigate = useNavigate();
-  const { user } = useSelector((state) => state.auth);
-  
-  // Dummy interview session data
-  const dummyInterviewSession = {
-    _id: 'dummy-session-id',
-    title: 'Technical Interview - Frontend Development',
-    description: 'This interview will test your knowledge of frontend development concepts, JavaScript, and React.',
-    expertise: 'Frontend Development',
-    createdBy: {
-      fullName: 'Interview Admin',
-      avatar: 'https://example.com/avatar.jpg'
-    },
-    questions: [
-      {
-        _id: 'q1',
-        text: 'Explain the difference between let, const, and var in JavaScript. When would you use each?'
-      },
-      {
-        _id: 'q2', 
-        text: 'What are React hooks? Explain useState and useEffect with examples.'
-      },
-      {
-        _id: 'q3',
-        text: 'How would you optimize the performance of a React application?'
-      },
-      {
-        _id: 'q4',
-        text: 'Explain the concept of closures in JavaScript with a practical example.'
-      },
-      {
-        _id: 'q5',
-        text: 'What is the virtual DOM in React and how does it improve performance?'
-      }
-    ]
-  };
-
-  // State management
-  const [interviewSession, setInterviewSession] = useState(dummyInterviewSession);
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [userAnswer, setUserAnswer] = useState('');
+const InterviewSession = () => {
+  const [isVideoOn, setIsVideoOn] = useState(true);
+  const [isAudioOn, setIsAudioOn] = useState(true);
+  const [isScreenSharing, setIsScreenSharing] = useState(false);
+  const [time, setTime] = useState(0);
   const [isRecording, setIsRecording] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [showFeedback, setShowFeedback] = useState(false);
-  const [aiFeedback, setAiFeedback] = useState(null);
-  const [timeRemaining, setTimeRemaining] = useState(30 * 60);
-  const [isPaused, setIsPaused] = useState(false);
-  const [interviewStarted, setInterviewStarted] = useState(false);
-  const [resultId, setResultId] = useState('dummy-result-id');
-  const [timeStarted, setTimeStarted] = useState(null);
+  const [showEndConfirm, setShowEndConfirm] = useState(false);
+  const navigate = useNavigate();
+  const videoRef = useRef(null);
 
-  // Refs
-  const textareaRef = useRef(null);
-  const timerRef = useRef(null);
-
-  // Timer effect
+  // Timer
   useEffect(() => {
-    if (interviewStarted && !isPaused && timeRemaining > 0) {
-      timerRef.current = setInterval(() => {
-        setTimeRemaining(prev => {
-          if (prev <= 1) {
-            clearInterval(timerRef.current);
-            handleEndInterview();
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    }
+    const timer = setInterval(() => {
+      setTime(prev => prev + 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
 
-    return () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-      }
-    };
-  }, [interviewStarted, isPaused, timeRemaining]);
-
-  // Format time
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  // Calculate time taken for current question
-  const getTimeTaken = () => {
-    if (!timeStarted) return 0;
-    return Math.floor((Date.now() - timeStarted) / 1000);
+  const handleEndInterview = () => setShowEndConfirm(true);
+
+  const confirmEndInterview = () => {
+    setIsRecording(false);
+    navigate('/user/dashboard');
   };
 
-  // Handle answer submission
-  const handleSubmitAnswer = async () => {
-    if (!userAnswer.trim()) return;
+  const cancelEndInterview = () => setShowEndConfirm(false);
 
-    setIsLoading(true);
-
-    try {
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      const feedback = generateAIFeedback(userAnswer, interviewSession.questions[currentQuestionIndex].text);
-      setAiFeedback(feedback);
-      setShowFeedback(true);
-    } catch (error) {
-      console.error('Error submitting answer:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Generate AI feedback (simulated)
-  const generateAIFeedback = (answer, question) => {
-    const feedbacks = [
-      {
-        score: Math.floor(Math.random() * 30) + 70,
-        feedback: "Excellent answer! You demonstrated a strong understanding of the concept.",
-        improvements: ["Consider adding more real-world examples", "You could mention edge cases"],
-        modelAnswer: "A comprehensive answer should include practical examples and edge cases. For example, when discussing variable declarations, you could mention hoisting behavior and temporal dead zone concepts."
-      },
-      {
-        score: Math.floor(Math.random() * 30) + 60,
-        feedback: "Good response with solid fundamentals. You covered the main points well.",
-        improvements: ["Provide more specific examples", "Explain the reasoning behind your approach"],
-        modelAnswer: "The key is to not only explain what something is, but why it matters. For instance, when discussing React hooks, explain the problems they solve compared to class components."
-      },
-      {
-        score: Math.floor(Math.random() * 30) + 80,
-        feedback: "Outstanding answer! You provided comprehensive explanations with excellent examples.",
-        improvements: ["Consider discussing alternative approaches", "You could mention browser compatibility considerations"],
-        modelAnswer: "This is an excellent response. To make it even better, you could discuss how different JavaScript engines implement these features and any potential performance implications."
-      }
-    ];
-    
-    return feedbacks[Math.floor(Math.random() * feedbacks.length)];
-  };
-
-  // Handle next question
-  const handleNextQuestion = () => {
-    if (currentQuestionIndex < interviewSession.questions.length - 1) {
-      setCurrentQuestionIndex(prev => prev + 1);
-      setUserAnswer('');
-      setShowFeedback(false);
-      setAiFeedback(null);
-      setTimeStarted(Date.now());
-    } else {
-      handleEndInterview();
-    }
-  };
-
-  // Handle interview start
-  const handleStartInterview = async () => {
-    try {
-      setIsLoading(true);
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      setInterviewStarted(true);
-      setTimeStarted(Date.now());
-      setTimeRemaining(30 * 60);
-    } catch (error) {
-      console.error('Error starting interview:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Handle interview end
-  const handleEndInterview = async () => {
-    try {
-      setIsLoading(true);
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      navigate('/interview/results/dummy-result-id');
-    } catch (error) {
-      console.error('Error ending interview:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  if (!interviewSession) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 flex items-center justify-center">
-        <div className="text-white text-xl">
-          {isLoading ? 'Loading interview session...' : 'Interview session not found'}
-        </div>
-      </div>
-    );
-  }
-
-  if (!interviewStarted) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 flex items-center justify-center p-4">
-        <div className="max-w-lg w-full bg-gray-800/30 backdrop-blur-md rounded-3xl p-12 border border-gray-700/30 shadow-2xl">
-          <div className="text-center">
-            <div className="w-20 h-20 bg-gradient-to-r from-purple-600 to-pink-600 rounded-2xl flex items-center justify-center mx-auto mb-8 shadow-lg">
-              <span className="text-3xl">🤖</span>
-            </div>
-            <h1 className="text-4xl font-black mb-4 bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-              {interviewSession.title}
-            </h1>
-            <p className="text-gray-300 text-lg mb-8 leading-relaxed">
-              {interviewSession.description}
-            </p>
-            
-            <div className="space-y-4 mb-8 text-left">
-              <div className="flex items-center space-x-3 text-gray-400">
-                <span className="w-2 h-2 bg-purple-500 rounded-full"></span>
-                <span><strong>Expertise:</strong> {interviewSession.expertise}</span>
-              </div>
-              <div className="flex items-center space-x-3 text-gray-400">
-                <span className="w-2 h-2 bg-purple-500 rounded-full"></span>
-                <span><strong>Questions:</strong> {interviewSession.questions.length}</span>
-              </div>
-              <div className="flex items-center space-x-3 text-gray-400">
-                <span className="w-2 h-2 bg-purple-500 rounded-full"></span>
-                <span><strong>Time Limit:</strong> 30 minutes</span>
-              </div>
-              <div className="flex items-center space-x-3 text-gray-400">
-                <span className="w-2 h-2 bg-purple-500 rounded-full"></span>
-                <span><strong>Interviewer:</strong> {interviewSession.createdBy.fullName}</span>
-              </div>
-            </div>
-            
-            <button
-              onClick={handleStartInterview}
-              disabled={isLoading}
-              className="w-full py-5 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 rounded-2xl font-bold text-xl transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed shadow-2xl hover:shadow-purple-500/25"
-            >
-              {isLoading ? 'Starting...' : 'Start Interview Now'}
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  const currentQuestion = interviewSession.questions[currentQuestionIndex];
+  const ControlButton = ({ icon, isActive, onClick, color = 'gray' }) => (
+    <button
+      onClick={onClick}
+      className={`w-14 h-14 rounded-full flex items-center justify-center transition-all duration-200 ${
+        isActive 
+          ? `bg-${color}-500 hover:bg-${color}-600 text-white` 
+          : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
+      } backdrop-blur-sm border border-gray-600/50`}
+    >
+      {icon}
+    </button>
+  );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900">
-      {/* Header */}
-      <header className="bg-gray-800/30 backdrop-blur-md border-b border-gray-700/30 p-6 shadow-lg">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <div className="w-10 h-10 bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl flex items-center justify-center">
-              <span className="text-lg">🤖</span>
-            </div>
-            <div>
-              <h1 className="text-xl font-bold text-white">{interviewSession.title}</h1>
-              <p className="text-gray-400 text-sm">{interviewSession.expertise}</p>
+    <div className="min-h-screen w-full bg-black text-white relative overflow-hidden">
+      <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-black to-blue-900/20"></div>
+
+      {showEndConfirm && (
+        <div className="absolute inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center">
+          <div className="bg-gray-900/90 border border-gray-700/50 rounded-2xl p-8 max-w-md mx-4 backdrop-blur-xl">
+            <div className="text-center">
+              <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
+              </div>
+              <h3 className="text-xl font-bold mb-2">End Interview?</h3>
+              <p className="text-gray-400 mb-6">Are you sure you want to end this interview? This action cannot be undone.</p>
+
+              <div className="flex gap-3 justify-center">
+                <button onClick={cancelEndInterview} className="px-6 py-3 bg-gray-700 hover:bg-gray-600 rounded-lg">
+                  Cancel
+                </button>
+                <button onClick={confirmEndInterview} className="px-6 py-3 bg-red-500 hover:bg-red-600 rounded-lg flex items-center gap-2">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                  End Interview
+                </button>
+              </div>
             </div>
           </div>
-          <div className="flex items-center space-x-3">
-            <button
-              onClick={() => setIsPaused(!isPaused)}
-              className="px-4 py-2.5 rounded-xl border border-gray-600 hover:border-purple-500 transition-all duration-300 hover:bg-gray-700/50"
-              title={isPaused ? "Resume Timer" : "Pause Timer"}
-              disabled={isLoading}
-            >
-              <span className="text-lg">{isPaused ? "▶️" : "⏸️"}</span>
-            </button>
+        </div>
+      )}
+
+      {/* MAIN LAYOUT */}
+      <div className="relative z-10 h-screen flex flex-col">
+
+        {/* HEADER */}
+        <div className="flex items-center justify-between px-6 py-4 bg-black/50 backdrop-blur-lg border-b border-gray-800/50">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+              <span className="text-sm">Recording {isRecording ? '•' : ''}</span>
+            </div>
+
+            <div className="text-lg font-semibold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
+              Interview Session
+            </div>
+          </div>
+
+          <div className="flex items-center gap-6">
+            {/* ❗ FIXED BUTTON TAG HERE ❗ */}
             <button
               onClick={handleEndInterview}
-              className="px-6 py-2.5 bg-red-600/20 hover:bg-red-600/30 border border-red-500/30 hover:border-red-500/50 rounded-xl transition-all duration-300 text-red-300 hover:text-red-200"
-              disabled={isLoading}
+              className="flex items-center gap-2 px-4 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg border border-red-500/30 hover:border-red-500/50"
             >
-              {isLoading ? 'Submitting...' : 'End Interview'}
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+              End
             </button>
-          </div>
-        </div>
-      </header>
 
-      <div className="flex flex-col lg:flex-row">
-        {/* Left Panel - Question and Answer */}
-        <div className="flex-1 lg:w-2/3 p-8 overflow-hidden">
-          <div className="h-full flex flex-col space-y-8">
-            {/* Question Display */}
-            <div className="bg-gray-800/30 backdrop-blur-md rounded-3xl p-8 border border-gray-700/30 shadow-xl">
-              <div className="flex items-center justify-between mb-6">
-                <span className="px-4 py-2 bg-purple-600/20 text-purple-300 rounded-xl text-sm font-medium border border-purple-500/30">
-                  Question {currentQuestionIndex + 1}
-                </span>
-                <div className="text-right">
-                  <span className="text-gray-400 text-sm font-medium">Progress</span>
-                  <div className="text-2xl font-bold text-purple-400">
-                    {currentQuestionIndex + 1} <span className="text-gray-400 text-lg">/ {interviewSession.questions.length}</span>
-                  </div>
-                </div>
-              </div>
-              <h2 className="text-2xl font-bold text-white leading-relaxed">
-                {currentQuestion.text}
-              </h2>
+            <div className="text-2xl font-mono bg-gradient-to-r from-green-400 to-cyan-400 bg-clip-text text-transparent">
+              {formatTime(time)}
             </div>
 
-            {/* Answer Input */}
-            {!showFeedback && (
-              <div className="flex-1 flex flex-col">
-                <div className="bg-gray-800/30 backdrop-blur-md rounded-3xl p-8 border border-gray-700/30 shadow-xl flex-1 flex flex-col">
-                  <div className="flex items-center justify-between mb-6">
-                    <h3 className="text-xl font-bold text-white">Your Answer</h3>
-                    <div className="flex items-center space-x-4">
-                      <button
-                        onClick={() => setIsRecording(!isRecording)}
-                        className={`p-4 rounded-2xl transition-all duration-300 ${
-                          isRecording 
-                            ? 'bg-red-600/20 border-red-500/50 animate-pulse' 
-                            : 'bg-gray-700/50 hover:bg-gray-600/50 border-gray-600/50 hover:border-gray-500/50'
-                        } border`}
-                        disabled={isLoading}
-                      >
-                        <span className="text-xl">🎤</span>
-                      </button>
-                      <button
-                        onClick={handleSubmitAnswer}
-                        disabled={!userAnswer.trim() || isLoading}
-                        className="px-8 py-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 rounded-2xl font-bold transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {isLoading ? 'Submitting...' : 'Submit Answer'}
-                      </button>
-                    </div>
-                  </div>
-                  <textarea
-                    ref={textareaRef}
-                    value={userAnswer}
-                    onChange={(e) => setUserAnswer(e.target.value)}
-                    placeholder="Type your answer here..."
-                    className="flex-1 bg-gray-900/50 border border-gray-600/50 rounded-2xl p-6 text-white placeholder-gray-400 resize-none focus:outline-none focus:border-purple-500/50 transition-all duration-300 text-lg"
-                    disabled={isLoading}
-                    rows={8}
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* AI Feedback */}
-            {showFeedback && aiFeedback && (
-              <div className="flex-1 flex flex-col space-y-8">
-                <div className="bg-gray-800/30 backdrop-blur-md rounded-3xl p-8 border border-gray-700/30 shadow-xl">
-                  <div className="flex items-center space-x-4 mb-6">
-                    <div className="w-12 h-12 bg-gradient-to-r from-purple-600 to-pink-600 rounded-2xl flex items-center justify-center">
-                      <span className="text-xl">🤖</span>
-                    </div>
-                    <h3 className="text-xl font-bold text-white">AI Feedback</h3>
-                  </div>
-                  
-                  <div className="mb-8">
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="text-gray-300 font-medium">Score</span>
-                      <span className="text-3xl font-black text-purple-400">{aiFeedback.score}%</span>
-                    </div>
-                    <div className="w-full bg-gray-700/50 rounded-2xl h-3 overflow-hidden">
-                      <div 
-                        className="bg-gradient-to-r from-purple-500 to-pink-500 h-3 rounded-2xl transition-all duration-1000"
-                        style={{ width: `${aiFeedback.score}%` }}
-                      ></div>
-                    </div>
-                  </div>
-
-                  <p className="text-gray-200 text-lg mb-8">{aiFeedback.feedback}</p>
-
-                  <div className="mb-8">
-                    <h4 className="font-bold text-white text-lg mb-4">Areas for Improvement:</h4>
-                    <ul className="space-y-3">
-                      {aiFeedback.improvements.map((improvement, index) => (
-                        <li key={index} className="text-gray-300">
-                          • {improvement}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-
-                  <div>
-                    <h4 className="font-bold text-white text-lg mb-4">Model Answer:</h4>
-                    <p className="text-gray-200 bg-gray-900/50 p-6 rounded-2xl border border-gray-700/50">
-                      {aiFeedback.modelAnswer}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex justify-between">
-                  <button
-                    onClick={() => {
-                      setShowFeedback(false);
-                      setAiFeedback(null);
-                    }}
-                    className="px-8 py-4 border border-gray-600/50 hover:border-purple-500/50 rounded-2xl transition-all duration-300"
-                    disabled={isLoading}
-                  >
-                    Edit Answer
-                  </button>
-                  <button
-                    onClick={handleNextQuestion}
-                    className="px-8 py-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 rounded-2xl font-bold transition-all duration-300"
-                    disabled={isLoading}
-                  >
-                    {currentQuestionIndex < interviewSession.questions.length - 1 ? "Next Question" : "Finish Interview"}
-                  </button>
-                </div>
-              </div>
-            )}
+            <div className="flex items-center gap-2 text-sm text-gray-400">
+              <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+              Secure Connection
+            </div>
           </div>
         </div>
 
-        {/* Right Panel - Timer and Progress */}
-        <div className="lg:w-1/3 p-8 bg-gray-800/20 backdrop-blur-md border-l border-gray-700/30">
-          <div className="space-y-8">
-            <div className="bg-gray-800/30 backdrop-blur-md rounded-3xl p-8 border border-gray-700/30 shadow-xl">
-              <h3 className="text-xl font-bold text-white mb-6">Session Timer</h3>
+        {/* VIDEO AREA */}
+        <div className="flex-1 flex flex-col lg:flex-row p-4 gap-4">
+
+          {/* Interviewer video */}
+          <div className="flex-1 relative rounded-2xl bg-gray-900/50 border border-gray-700/50 overflow-hidden">
+            <div className="absolute inset-0 flex items-center justify-center">
               <div className="text-center">
-                <div className="text-5xl font-black text-purple-400 mb-3 font-mono">
-                  {formatTime(timeRemaining)}
+                <div className="w-24 h-24 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center mx-auto mb-4">
+                  <span className="text-2xl font-bold">JS</span>
                 </div>
-                <div className="text-gray-400">
-                  {isPaused ? "Paused" : "Time Remaining"}
-                </div>
+                <p className="text-gray-400">John Smith - Interviewer</p>
+                <p className="text-sm text-gray-500 mt-2">Senior Hiring Manager</p>
               </div>
             </div>
 
-            <div className="bg-gray-800/30 backdrop-blur-md rounded-3xl p-8 border border-gray-700/30 shadow-xl">
-              <h3 className="text-xl font-bold text-white mb-6">Progress</h3>
-              <div className="mb-6">
-                <div className="flex justify-between text-sm mb-3">
-                  <span className="text-gray-300">Questions Completed</span>
-                  <span className="text-purple-400 font-bold">{currentQuestionIndex + 1}/{interviewSession.questions.length}</span>
-                </div>
-                <div className="w-full bg-gray-700/50 rounded-2xl h-3 overflow-hidden">
-                  <div 
-                    className="bg-gradient-to-r from-purple-500 to-pink-500 h-3 rounded-2xl transition-all duration-500"
-                    style={{ width: `${((currentQuestionIndex + 1) / interviewSession.questions.length) * 100}%` }}
-                  ></div>
-                </div>
-              </div>
+            <div className="absolute top-4 left-4 bg-black/50 px-3 py-2 rounded-lg text-gray-300 text-sm flex items-center gap-2">
+              <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+              1080p • 60fps
             </div>
+          </div>
 
-            <div className="bg-gray-800/30 backdrop-blur-md rounded-3xl p-8 border border-gray-700/30 shadow-xl">
-              <h3 className="text-xl font-bold text-white mb-6">Candidate Info</h3>
-              <div className="space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-gray-300">Name:</span>
-                  <span className="text-white">{user?.fullName || 'Test Candidate'}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-300">Email:</span>
-                  <span className="text-white">{user?.email || 'test@example.com'}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-300">Status:</span>
-                  <span className="text-green-400">In Progress</span>
+          {/* User camera */}
+          <div className="lg:w-96 xl:w-[500px] relative rounded-2xl bg-gray-900/50 border border-gray-700/50 overflow-hidden">
+
+            {isVideoOn ? (
+              <div className="absolute inset-0 bg-gradient-to-br from-blue-900/20 to-purple-900/20 flex items-center justify-center">
+                <div className="text-center">
+                  <div className="w-20 h-20 rounded-full bg-gradient-to-r from-green-500 to-cyan-500 flex items-center justify-center mx-auto mb-4">
+                    <span className="text-xl font-bold">YC</span>
+                  </div>
+                  <p className="text-gray-400">Your Camera</p>
                 </div>
               </div>
+            ) : (
+              <div className="absolute inset-0 flex items-center justify-center bg-gray-800/50">
+                <div className="text-center">
+                  <div className="w-16 h-16 bg-gray-600 rounded-full mx-auto mb-4 flex items-center justify-center">
+                    <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                    </svg>
+                  </div>
+                  <p className="text-gray-400">Camera Off</p>
+                </div>
+              </div>
+            )}
+
+            <div className="absolute top-4 right-4 bg-black/50 px-3 py-1 rounded-lg text-sm text-gray-300">
+              720p • 30fps
             </div>
           </div>
         </div>
+
+        {/* CONTROLS */}
+        <div className="p-6 bg-black/50 backdrop-blur-lg border-t border-gray-800/50">
+          <div className="flex justify-center gap-8">
+
+            <ControlButton
+              icon={isAudioOn ? (
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                </svg>
+              ) : (
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
+                </svg>
+              )}
+              isActive={isAudioOn}
+              onClick={() => setIsAudioOn(!isAudioOn)}
+              color={isAudioOn ? "green" : "red"}
+            />
+
+            <ControlButton
+              icon={isVideoOn ? (
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                </svg>
+              ) : (
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
+                </svg>
+              )}
+              isActive={isVideoOn}
+              onClick={() => setIsVideoOn(!isVideoOn)}
+              color={isVideoOn ? "green" : "red"}
+            />
+
+            <ControlButton
+              icon={
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                </svg>
+              }
+              isActive={isScreenSharing}
+              onClick={() => setIsScreenSharing(!isScreenSharing)}
+              color="blue"
+            />
+
+            <ControlButton
+              icon={
+                isRecording ? (
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <circle cx="12" cy="12" r="9" strokeWidth={2}></circle>
+                    <rect x="9" y="9" width="6" height="6" rx="1" strokeWidth={2}></rect>
+                  </svg>
+                ) : (
+                  <svg className="w-6 h-6" fill="red" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2M6 21h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                  </svg>
+                )
+              }
+              isActive={isRecording}
+              onClick={() => setIsRecording(!isRecording)}
+              color="red"
+            />
+
+            <button 
+              onClick={handleEndInterview}
+              className="w-16 h-16 rounded-full bg-red-500 hover:bg-red-600 flex items-center justify-center transform hover:scale-105"
+            >
+              <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+
+          </div>
+        </div>
+
+        {/* FOOTER INFO */}
+        <div className="px-6 py-3 bg-black/30 border-t border-gray-800/30 text-sm text-gray-400 flex justify-between">
+          <div className="flex items-center gap-6">
+            <span>Interview ID: INV-2024-001</span>
+            <span>•</span>
+            <span>AI Proctoring: Active</span>
+          </div>
+
+          <div className="flex items-center gap-4">
+            <span>Connection: Excellent</span>
+            <span>•</span>
+            <span>Encrypted: TLS 1.3</span>
+          </div>
+        </div>
+
       </div>
     </div>
   );
 };
 
-export default Interview;
+export default InterviewSession;
